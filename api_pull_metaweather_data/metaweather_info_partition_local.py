@@ -1,4 +1,4 @@
-"""This module contains the Operations which are performrnd in local"""
+"""This module contains script for uploading data in json format in partiton path"""
 import os
 import configparser
 import json
