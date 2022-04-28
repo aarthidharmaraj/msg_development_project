@@ -1,0 +1,3 @@
+crawler_name,database_name,s3_path,role
+datalake-appetize-api,appetize,s3://msg-datalake-us-east-1-dev/appetize-api/source/,service-role/AWSGlueServiceRole-dataplatforms
+datalake-medallia,apple,s3://msg-datalake-us-east-1-dev/medallia/responses/source/medallia_daily_survey_response,service-role/AWSGlueServiceRole-dataplatforms
