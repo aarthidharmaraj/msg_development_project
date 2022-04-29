@@ -27,3 +27,4 @@ class MetaweatherPartitionLocal:
             json.dump(weather_data, file)
             print("Successfully created json file in the given path\n")
             self.logger.info("Successfully created json file in the given path")
+            # return 'json file created'
