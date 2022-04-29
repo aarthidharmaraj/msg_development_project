@@ -70,7 +70,7 @@ class PullMetaWeatherDataUploadS3:
         # if d <= self.enddate]:
         for day in range(day_count):
             single_date = self.startdate + timedelta(day)
-            # print(single_date)
+            # return(single_date)
             self.get_metaweather_data_for_each_city(single_date)
 
     def get_metaweather_data_for_each_city(self, date):
@@ -124,6 +124,7 @@ class PullMetaWeatherDataUploadS3:
             with open(parent_dir + "/details.ini", "w", encoding="utf-8") as file:
                 config.write(file)
             self.logger.info("Last date has been updated in config file")
+            # return last_run
         else:
             self.logger.info("Last date cannot be updated because of presence of end date")
 
