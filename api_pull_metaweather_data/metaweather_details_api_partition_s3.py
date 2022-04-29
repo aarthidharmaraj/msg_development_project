@@ -99,7 +99,7 @@ class PullMetaWeatherDataUploadS3:
                     day=values[2],
                     hour=values[3],
                 )
-                print(partition_path)
+                # print(partition_path)
                 # return partition_path
                 self.local.upload_parition_s3_local(partition_path, data)
                 # self.upload_to_s3(partition_path)
@@ -107,12 +107,12 @@ class PullMetaWeatherDataUploadS3:
                 self.logger.info("The provided dates and created dates are not matching")
                 # print("We can partition only the created record match with provided dates",values[2],"is not a match")
 
-    # def upload_to_s3(self, partition_path):
-    #     """This method used to upload the file to s3 in the partiton created"""
-    #     path = self.local_apipath + partition_path
-    #     for file in os.listdir(path):
-    #         response = self.s3_client.upload_file(file, path)
-    #     return response
+    def upload_to_s3(self, partition_path):
+        """This method used to upload the file to s3 in the partiton created"""
+        path = self.local_apipath + partition_path
+        for file in os.listdir(path):
+            response = self.s3_client.upload_file(file, path)
+        return response
 
     def last_date_of_execution(self):
         """If there is no end date,this method get last date of api run
