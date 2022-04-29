@@ -149,7 +149,7 @@ class TestUploadPartitionLocal:
     @pytest.mark.xfail
     def test_write_data_to_local_file_is_not_done(self):
         """ This method will test for the data is not written
-            to local file in class S3Operations """
+            to local file in class Metaweather PartitionLocal """
         self.obj_local = MetaweatherPartitionLocal(logger_obj)
         path='local/test/metaweather_api/'
         local_file = self.obj_local.upload_parition_s3_local(path, 'weather_data')
