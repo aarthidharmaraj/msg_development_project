@@ -1,7 +1,6 @@
 """This module contains script for uploading data in json format in partiton path"""
 import os
 import configparser
-import json
 
 parent_dir = os.path.dirname(os.getcwd())
 config = configparser.ConfigParser()
@@ -17,14 +16,12 @@ class MetaweatherPartitionLocal:
             parent_dir, config["local_metaweather_api"]["local_file_path"]
         )
 
-    def upload_parition_s3_local(self, partition_path, weather_data):
+    def upload_parition_s3_local(self, new_df, file_name, partition_path):
         """This method uploads weatherdata in the partition path in the form of json"""
-        new_dir = self.local_apipath + partition_path
-        # file_name=values[3]+" : "+values[2]+"-"+ values[1]+"-"+values[0]
+        new_dir = self.local_apipath + "/" + partition_path + "/"
         if not os.path.exists(new_dir):
             os.makedirs(new_dir)
-        with open(new_dir + "weather_data.json", "w", encoding="utf-8") as file:
-            json.dump(weather_data, file)
-            print("Successfully created json file in the given path\n")
-            self.logger.info("Successfully created json file in the given path")
-            # return 'json file created'
+        new_df.to_json(new_dir + file_name, orient="records", lines=True)
+        print("Successfully created json file in the given path\n")
+        self.logger.info("Successfully created json file in the given path")
+        return "json file created"
