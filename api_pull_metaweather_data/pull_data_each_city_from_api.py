@@ -1,5 +1,4 @@
 """ This module is to pull data from api for each cities in USA"""
-import sys
 import requests
 
 
@@ -22,12 +21,11 @@ class PullDataFromMetaweatherApi:
                 )
             ).json()
             self.logger.info("The Metaweather information of each city are got from the api")
-            # print(response)
-            return response
 
         except Exception as err:
             print("Cannot able to fetch the MetaWeather data of woeid due to Problems in api", err)
             self.logger.info(
                 "Cannot able to fetch the MetaWeather data of woeid due to Problems in api"
             )
-            sys.exit()
+            response = None
+        return response
