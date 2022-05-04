@@ -31,13 +31,13 @@ logger_obj = logging.getLogger()
 @pytest.fixture
 def start_date():
     """This method returns the start_date"""
-    return "2022-05-02"
+    return "2022-05-03"
 
 
 @pytest.fixture
 def end_date():
     """This method returns the end_date"""
-    return "2022-05-03"
+    return "2022-05-04"
 
 
 @pytest.fixture
@@ -50,6 +50,10 @@ def city():
 def woeid_id():
     """This method returns the woeid of city"""
     return "2352824"
+@pytest.fixture
+def file_name(city):
+    """This method returns the file name in epoch format"""
+    return f"metaweather_{city}_{int(time())}.json"
 
 
 class TestMetaWeatherApi:
@@ -90,7 +94,7 @@ class TestMetaWeatherApi:
         ).json()
         self.obj_metaapi = PullMetaWeatherDataUploadS3(logger_obj, start_date, end_date)
         result = self.obj_metaapi.filter_group_response_by_hour(response, city, search_date)
-        assert result is True
+        assert result == True
 
     @pytest.mark.xfail
     def test_filter_group_response_by_hour_is_notdone(self, start_date, end_date, city, woeid_id):
@@ -103,7 +107,7 @@ class TestMetaWeatherApi:
         ).json()
         self.obj_metaapi = PullMetaWeatherDataUploadS3(logger_obj, start_date, end_date)
         result = self.obj_metaapi.filter_group_response_by_hour(response, city, search_date)
-        assert result is False
+        assert result == False
 
     def test_put_partition_path_isdone(self, start_date, end_date, city):
         """This method tests for giving the partition path based on city,year,month,date.hour"""
@@ -117,7 +121,7 @@ class TestMetaWeatherApi:
         based on city,year,month,date.hour"""
         self.obj_metaapi = PullMetaWeatherDataUploadS3(logger_obj, start_date, end_date)
         response = self.obj_metaapi.put_partition_path(city, "2022-05-03T07")
-        assert response != "pt_city=albuquerque/pt_year=2022/pt_month=05/pt_day=03/pt_hour=07/"
+        assert response is None
 
     def test_exceution_last_date_isupdated(self, start_date, end_date):
         """This method tests for the last date of execution is updated in config file"""
@@ -133,7 +137,7 @@ class TestMetaWeatherApi:
         self.obj_metaapi = PullMetaWeatherDataUploadS3(logger_obj, start_date, end_date)
         self.obj_metaapi.last_date_of_execution()
         last_date = config.get("last_execution_of_api", "last_run_date")
-        assert last_date != datetime.now().date()
+        assert last_date is None
 
 
 class TestPullDataForEachCity:
@@ -188,7 +192,7 @@ class TestS3Details:
         """This method will test for the report is uploaded to S3 in class S3Operations"""
         self.s3_client = S3Details(logger_obj)
         res = self.s3_client.upload_file(b"flow of code", "flow.txt")
-        assert res == "flow of"
+        assert res is None
 
 
 class TestUploadPartitionLocal:
@@ -200,23 +204,22 @@ class TestUploadPartitionLocal:
         self.obj_local = MetaweatherPartitionLocal(logger_obj)
         assert isinstance(self.obj_local, MetaweatherPartitionLocal)
 
-    def test_write_data_to_local_file_is_done(self, city):
+    def test_write_data_to_local_file_is_done(self, city,file_name):
         """This method will test for the data is written to local file
         in class Metaweather Partition local"""
         self.obj_local = MetaweatherPartitionLocal(logger_obj)
-        file_name = f"metaweather_{city}_{int(time())}.json"
+        # file_name = f"metaweather_{city}_{int(time())}.json"
         partition_path = "pt_city=albuquerque/pt_year=2022/pt_month=05/pt_day=03/pt_hour=07/"
         new_df = pd.DataFrame()
         local_file = self.obj_local.upload_parition_s3_local(new_df, file_name, partition_path)
-        assert local_file == "json file created"
+        assert local_file == f"metaweather_{city}_{int(time())}.json"
 
     @pytest.mark.xfail
-    def test_write_data_to_local_file_is_not_done(self):
+    def test_write_data_to_local_file_is_not_done(self,file_name):
         """This method will test for the data is not written
         to local file in class Metaweather PartitionLocal"""
         self.obj_local = MetaweatherPartitionLocal(logger_obj)
-        file_name = f"metaweather_{city}_{int(time())}.json"
         partition_path = "pt_city=albuquerque/pt_year=2022/pt_month=05/pt_day=03/pt_hour=07/"
         new_df = pd.DataFrame()
         local_file = self.obj_local.upload_parition_s3_local(new_df, file_name, partition_path)
-        assert local_file == "json file not created"
+        assert local_file == None
