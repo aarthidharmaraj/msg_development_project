@@ -2,7 +2,6 @@
     given api "https://www.metaweather.com/api/" based on provided dates
     and store them in S3 in the partitoned format """
 
-
 import logging
 import configparser
 from datetime import datetime, timedelta
@@ -11,9 +10,7 @@ import os
 from time import time
 import sys
 import pandas as pd
-
-# from sqlite3 import Timestamp
-# from aws_s3.s3_details import S3Details
+from aws_s3.s3_details import S3Details
 from pull_data_each_city_from_api import PullDataFromMetaweatherApi
 from metaweather_info_partition_local import MetaweatherPartitionLocal
 
@@ -31,32 +28,34 @@ class PullMetaWeatherDataUploadS3:
         self.woeid = config["city_woeid"]
         self.startdate = startdate
         self.enddate = enddate
-        self.local_apipath = os.path.join(
-            parent_dir, config["local_metaweather_api"]["local_file_path"]
-        )
+        self.local_apipath = os.path.join(parent_dir, config["metaweather_api"]["local_file_path"])
         self.metaweather_cityapi = PullDataFromMetaweatherApi(logger_obj)
         self.local = MetaweatherPartitionLocal(logger_obj)
-        # self.s3_client = S3Details(logger_obj)
+        self.s3_client = S3Details(logger_obj)
 
     def check_for_presence_of_given_dates(self):
         """If there is a presence of enddate and startdate,it gets informationbetween them
         else gets end date alone orelse gets the information for last date and previous date"""
-        last_run_date = config["last_execution_of_api"]["last_run_date"]
+        last_run_date = config["metaweather_api"]["last_run_date"]
         last_run = datetime.strptime(last_run_date, "%Y-%m-%d").date()
         if self.enddate:
             if self.enddate and self.startdate and self.enddate > self.startdate:
-                self.logger.info(
-                    "Getting metaweather info b/w the provided start date/previous date and enddate"
-                )
-                print("Between start and end dates")
-                dates = {"date1": self.enddate, "date2": self.startdate}
+                if self.enddate == datetime.now().date():
+                    dates = {"date1": (self.enddate) - timedelta(days=1), "date2": self.startdate}
+                    self.logger.info("Skip for current date")
+                else:
+                    self.logger.info(
+                        "Getting metaweather info b/w the provided start date/previous date and enddate"
+                    )
+                    print("Between start and end dates")
+                    dates = {"date1": self.enddate, "date2": self.startdate}
             else:
                 print("only for end date")
                 self.logger.info("Getting metaweather information for the end date alone")
                 dates = {"date1": self.enddate, "date2": self.enddate}
         else:
-            if last_run and last_run > self.startdate:
-                dates = {"date1": last_run, "date2": self.startdate}
+            if last_run and last_run < self.startdate:
+                dates = {"date1": self.startdate, "date2": last_run}
                 self.logger.info(
                     "Getting metaweather information between lastdate and previous date"
                 )
@@ -86,8 +85,9 @@ class PullMetaWeatherDataUploadS3:
             if response is not None:
                 self.filter_group_response_by_hour(response, key, date)
             else:
+                print("Cannot fetch the data from api due to problem in api ")
+                self.logger.error("Cannot fetch the data from api due to problem in api")
                 sys.exit()
-        return response
 
     def filter_group_response_by_hour(self, response, city_name, date):
         """This method filters and creates a dataframe from the response
@@ -98,20 +98,17 @@ class PullMetaWeatherDataUploadS3:
         try:
             for i in range(24):
                 time_hour = "{date}T{hour}".format(date=date, hour=str(i).zfill(2))
-                # new_df=df_data[df_data['created'].isin(time_hour)]
                 new_df = df_data[(df_data.created.str.contains(time_hour))]
-                if (new_df.created.notnull()).any():
+                if not new_df.empty:
                     filter_time = time_hour
                     partition_path = self.put_partition_path(city_name, filter_time)
-                    file = self.local.upload_parition_s3_local(new_df, file_name, partition_path)
-                    # file=self.upload_to_s3(partition_path, file_name)
+                    self.local.upload_parition_s3_local(new_df, file_name, partition_path)
+                    # self.upload_to_s3(new_df,partition_path, file_name)
                     # return True
         except Exception as err:
             print("Cannot filter the datas in dataframe due to this error:", err)
             self.logger.error("Cannot filter the datas in dataframe due to an error")
-            file = None
             # return False
-        return file
 
     def put_partition_path(self, city_name, filter_time):
         """This method will make partion path based on city,year,month,date
@@ -128,14 +125,14 @@ class PullMetaWeatherDataUploadS3:
             partition_path = None
         return partition_path
 
-    def upload_to_s3(self, partition_path, file_name):
+    def upload_to_s3(self, new_df, partition_path, file_name):
         """This method used to upload the file to s3 in the partiton created"""
-        file = open(
-            self.local_apipath + "/" + partition_path + "/" + file_name, "r", encoding="utf-8"
-        ).read()
+        file = new_df.to_json()
+        # print(file)
         key = partition_path + "/" + file_name
         self.logger.info("The file is being uploaded to s3 in the given path")
-        self.upload_to_s3(file, key)
+        print("the file has been uploaded to s3 in the given path")
+        self.s3_client.upload_file(file, key)
 
     def last_date_of_execution(self):
         # def last_date_of_execution(self,end_date):
@@ -144,7 +141,7 @@ class PullMetaWeatherDataUploadS3:
         if not self.enddate:
             # if not end_date:
             last_run = datetime.now().date()
-            config.set("last_execution_of_api", "last_run_date", str(last_run))
+            config.set("metaweather_api", "last_run_date", str(last_run))
             with open(parent_dir + "/details.ini", "w", encoding="utf-8") as file:
                 config.write(file)
             self.logger.info("Last date has been updated in config file")
@@ -166,7 +163,7 @@ def valid_date(date):
 
 def main():
     """This is the main method for this module"""
-    log_dir = os.path.join(parent_dir, config["log_metaweather"]["log_path"])
+    log_dir = os.path.join(parent_dir, config["metaweather_api"]["log_path"])
     log_file = os.path.join(log_dir, "metaweather_logfile.log")
 
     logging.basicConfig(
@@ -184,7 +181,7 @@ def main():
         "--startdate",
         help="The Start Date - format YYYY-MM-DD",
         type=valid_date,
-        # default=datetime.now().date() - timedelta(days=1),
+        default=datetime.now().date() - timedelta(days=1),
     )
     parser.add_argument("--enddate", help="The End Date - format YYYY-MM-DD", type=valid_date)
     args = parser.parse_args()
