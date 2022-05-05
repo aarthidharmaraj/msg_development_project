@@ -13,7 +13,7 @@ class MetaweatherPartitionLocal:
     def __init__(self, logger):
         self.logger = logger
         self.local_apipath = os.path.join(
-            parent_dir, config["local_metaweather_api"]["local_file_path"]
+            parent_dir, config["metaweather_api"]["local_file_path"]
         )
 
     def upload_parition_s3_local(self, new_df, file_name, partition_path):
@@ -25,10 +25,9 @@ class MetaweatherPartitionLocal:
             new_df.to_json(new_dir + file_name, orient="records", lines=True)
             print("Successfully created json file in the given path\n")
             self.logger.info("Successfully created json file in the given path")
-            # return "json file created"
-            # print(file_name)
-            return file_name
+
         except Exception as err:
             print("Cannot upload the json file in the given path:", err)
             self.logger.error("Cannot upload the json file in the given path")
-            return None
+            file_name= None
+        return file_name
