@@ -91,7 +91,7 @@ class PullMetaWeatherDataUploadS3:
             else:
                 print("Cannot fetch the data from api due to problem in api ")
                 self.logger.error("Cannot fetch the data from api due to problem in api")
-                sys.exit()
+                sys.exit("The system is terminated due to problem in api")
 
     def filter_group_response_by_hour(self, response, city_name, date):
         """This method filters and creates a dataframe from the response
@@ -118,7 +118,6 @@ class PullMetaWeatherDataUploadS3:
                 "predictability",
             ],
         )
-        df_data.to_csv("df.csv")
 
         try:
             for i in range(24):
