@@ -1,0 +1,32 @@
+"""This module contains script for uploading data in json format in partiton path"""
+import os
+import configparser
+import shutil
+
+parent_dir = os.path.dirname(os.getcwd())
+config = configparser.ConfigParser()
+config.read(parent_dir + "/details.ini")
+
+
+class EmployeeDetailsPartitionLocalUpload:
+    """This class has methods for local operations"""
+
+    def __init__(self, logger):
+        self.logger = logger
+        self.local_sqlpath = os.path.join(parent_dir, config["sql_employee_details_joiningdate"]["local_file_path"])
+
+    def upload_parition_s3_local(self, copy_source, file_name, partition_path):
+        """This method uploads weatherdata in the partition path in the form of json"""
+        try:
+            new_dir = self.local_sqlpath + "/" + partition_path + "/"
+            if not os.path.exists(new_dir):
+                os.makedirs(new_dir)
+            shutil.copy(copy_source, new_dir)
+            print("Successfully created json file in the given path\n")
+            self.logger.info("Successfully created json file in the given path")
+
+        except Exception as err:
+            print("Cannot upload the json file in the given path:", err)
+            self.logger.error("Cannot upload the json file in the given path")
+            file_name = None
+        return file_name
