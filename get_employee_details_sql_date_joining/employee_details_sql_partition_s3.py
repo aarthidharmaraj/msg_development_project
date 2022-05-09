@@ -1,5 +1,5 @@
-"""This module is to get the details of employees as per their date of 
-joining and upload to s3 in that parttition of joining date"""
+""" This module is to get the details of employees as per their date of 
+joining and upload to s3 in that partition of joining date"""
 
 
 import logging
@@ -9,10 +9,8 @@ import argparse
 from datetime import datetime, timedelta
 import sys
 from time import time
-import pandas as pd
 from get_employee_details_sql import GetEmployeeFromSql
 from employee_details_upload_local import EmployeeDetailsPartitionLocalUpload
-
 # from aws_s3.s3_details import S3Details
 
 parent_dir = os.path.dirname(os.getcwd())
@@ -31,67 +29,76 @@ class EmployeeDetailsJoiningDate:
         self.local_sqlpath = os.path.join(
             parent_dir, config["sql_employee_details_joiningdate"]["local_file_path"]
         )
+        if not os.path.exists(self.local_sqlpath):
+            os.makedirs(self.local_sqlpath)
         self.local = EmployeeDetailsPartitionLocalUpload(logger_obj)
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = GetEmployeeFromSql(logger_obj
+                                      )
         # self.s3_client = S3Details(logger_obj)
 
     def get_employee_details_for_givendates(self):
         """This method is to get the employee details for the given dates"""
-        if self.startdate < self.enddate:
-            dates = {"date1": self.enddate, "date2": self.startdate}
+        if self.enddate<=(datetime.now().date()):
+            if self.startdate < self.enddate:
+                dates = {"date1": self.startdate, "date2": self.enddate}
+            else:
+                dates = {"date1": self.enddate, "date2": self.startdate}
+            self.logger.info("Filtering Employee details from given startdate to enddate")
+            print("Filtering Employee details from given startdate to enddate")
         else:
-            dates = {"date1": self.startdate, "date2": self.enddate}
-        self.logger.info("Filtering Employee details from given startdate to enddate")
-        print("Filtering Employee details from given startdate to enddate")
+            self.logger.info("Cannot fetch the details for future dates")
+            print("Cannot fetch the details for future dates")
+            sys.exit("script was terminated when fetching for future dates")
         return dates
 
-    def get_employeedetails_for_each_date(self, date1, date2):
-        """This method gets employee details between the two dates onebyone"""
-        day_count = (date1 - date2).days + 1
-        print(day_count)
-        for day in range(day_count):
-            single_date = date2 + timedelta(day)
-            self.logger.info("Getting metaweather data for provided dates one by one")
-            self.get_employee_details_from_sql(single_date)
-
-    def get_employee_details_from_sql(self, date):
-        """This method gets the employee detailsfor given date from sql"""
-        response = self.sql.get_employee_details_by_joiningdate(date)
+    def employee_details_from_sql(self):
+        """This method gets the employee details from sql and filter based on dates"""
+        dates = self.get_employee_details_for_givendates()
+        response = self.sql.get_employee_details_by_joiningdate(dates["date1"], dates["date2"])
+        print(response)
         if response is not None:
-            self.filter_group_response_by_date(response, date)
+            day_count = (dates["date2"] - dates["date1"]).days + 1
+            for day in range(day_count):
+                single_date = dates["date1"] + timedelta(day)
+                print(single_date)
+                file_name = f"employee_{int(time())}.json"
+                self.filter_create_response_by_date(response,file_name, single_date)
+                self.logger.info("Filtering the response based on dates")
         else:
-            print("Cannot fetch the data from api due to problem in api ")
-            self.logger.error("Cannot fetch the data from api due to problem in api")
+            print("Cannot fetch the data from sql due to problem in sql ")
+            self.logger.error("Cannot fetch the data from sql due to problem in sql")
             sys.exit("The script has terminated due to problem in sql")
 
-    def filter_group_response_by_date(self, response, emp_name, date):
-        """This method filters and creates a dataframe from the response
+    def filter_create_response_by_date(self, df_data,file_name, date):
+        """This method filters and creates a newdataframe from the response
         based on date using pandas"""
         epoch = int(time())
-        file_name = f"metaweather_{emp_name}_{epoch}.json"
-        df_data = pd.DataFrame(response)
-
+        # emp_name=df_data._get_value('emp_Name')
+        # file_name = f"employee_{epoch}.json"
         try:
-            new_df = df_data[(df_data.created.str.contains(emp_name))]
-            # if not new_df.empty:
-            #     filter_time = date
-            new_df.to_json(self.local_sqlpath + "/" + file_name, orient="records", lines=True)
-            partition_path = self.put_partition_path(emp_name, date)
-            copy_source = self.local_sqlpath + "/" + file_name
-            self.local.upload_parition_s3_local(copy_source, file_name, partition_path)
-            # self.upload_to_s3(copy_source,partition_path, file_name)
-            # return True
+            new_df = df_data[(df_data["Date_of_Joining"] == date)]
+            if not new_df.empty:
+                # new_df.info()
+                # new_df=new_df.astype({'emp_Name':str})
+                # emp_name=str(df_data['emp_Name'].astype(str))
+                # file_name = f"employee_{emp_name}_{epoch}.json"
+                # print(emp_name)
+                new_df.to_json(self.local_sqlpath + "/" + file_name, orient="records", lines=True)
+                partition_path = self.put_partition_path(date)
+                copy_source = self.local_sqlpath + "/" + file_name
+                self.local.upload_parition_s3_local(copy_source, file_name, partition_path)
+                # self.upload_to_s3(copy_source,partition_path, file_name)
+            return True
         except Exception as err:
             print("Cannot filter the datas in dataframe due to this error:", err)
             self.logger.error("Cannot filter the datas in dataframe due to an error")
-            # return False
+            return False
 
     def put_partition_path(self, date):
-        """This method will make partion path based on city,year,month,date
-        and hour and avoid overwrite of file and upload to local"""
+        """This method will make partion path based on year,month,date
+        and avoid overwrite of file and upload to local"""
         try:
-            date = datetime.strptime(date, "%Y-%m-%d")
-            partition_path = date.strftime(f"pt_year=%Y/pt_month=%m/pt_day=%d/pt_hour=%H/")
+            partition_path = date.strftime("pt_year=%Y/pt_month=%m/pt_day=%d")
             print(partition_path)
         except Exception as err:
             self.logger.error("Cannot made a parttiion")
@@ -147,9 +154,10 @@ def main():
     )
     args = parser.parse_args()
     employee_details = EmployeeDetailsJoiningDate(logger_obj, args.startdate, args.enddate)
-    dates = employee_details.get_employee_details_for_givendates()
-    # employee_details.get_employeedetails_for_a_date(dates["date1"], dates["date2"])
-    employee_details.get_employee_details_from_sql(dates["date1"], dates["date2"])
+    # employee_details.get_employee_details_for_givendates()
+    employee_details.employee_details_from_sql()
+    # employee_details.get_employeedetails_for_each_date(dates["date1"], dates["date2"])
+    # employee_details.get_employee_details_from_sql(dates["date1"], dates["date2"])
 
 
 if __name__ == "__main__":
