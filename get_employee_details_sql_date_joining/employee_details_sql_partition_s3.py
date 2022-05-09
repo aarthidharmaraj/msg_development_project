@@ -154,10 +154,7 @@ def main():
     )
     args = parser.parse_args()
     employee_details = EmployeeDetailsJoiningDate(logger_obj, args.startdate, args.enddate)
-    # employee_details.get_employee_details_for_givendates()
     employee_details.employee_details_from_sql()
-    # employee_details.get_employeedetails_for_each_date(dates["date1"], dates["date2"])
-    # employee_details.get_employee_details_from_sql(dates["date1"], dates["date2"])
 
 
 if __name__ == "__main__":
