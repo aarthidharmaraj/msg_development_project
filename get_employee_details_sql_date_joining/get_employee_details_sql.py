@@ -19,13 +19,12 @@ class GetEmployeeFromSql:
         self.driver = config["sql_server"]["driver"]
         self.host = config["sql_server"]["host"]
         self.database = config["sql_server"]["database"]
+        self.table = config["sql_server"]["table"]
         self.user = config["sql_server"]["user"]
         self.password = config["sql_server"]["password"]
 
     def sql_connection(self):
         """This method is to connect the sql server using pyodbc"""
-        # for driver in pyodbc.drivers():
-        #     print(driver)
         try:
             conn = pyodbc.connect(
                 Driver=self.driver,
@@ -43,36 +42,38 @@ class GetEmployeeFromSql:
             conn = None
         return conn
 
-    def get_employee_details_by_joiningdate(self, startdate, enddate):
+    def get_employee_details_by_joiningdate(self, query):
         """This method is to get the employee details from sql by filtering"""
         try:
-            # query='SELECT * from employee where Date_of_Joining >= {} and
-            # Date_of_Joining <= {}'.format(startdate, enddate)
-            # query = "SELECT * FROM employee WHERE Date_of_Joining ="f"'{joining_date}'"
             conn = self.sql_connection()
-            data = "SELECT * from employee where Date_of_Joining between ? and ?"
-            df_data = pd.read_sql(data, conn, params=(startdate, enddate))
+            # query = "SELECT * from employee where Date_of_Joining between ?
+            # and ? Order By Date_of_Joining asc"
+            # df_data=pd.read_sql(query, conn, params=(startdate, enddate))
+            df_data = pd.read_sql(query, conn)
         except Exception as err:
             print("Cannot filter the employee details for given date", err)
             self.logger.error("Cannot filter the employee details for given date")
             df_data = None
         return df_data
 
-
-# def main():
-#     """This is the main method"""
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         filename="log_file.log",
-#         datefmt="%d-%b-%y %H:%M:%S",
-#         format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-#         filemode="w",
-#     )
-#     logger = logging.getLogger()
-#     sql = GetEmployeeFromSql(logger)
-#     # sql.sql_connection()
-#     sql.get_employee_details_by_joiningdate("2021-05-31")
-
-
-# if __name__ == "__main__":
-#     main()
+    def get_query_from_where_condition(self, start, condition, end):
+        """This method gets the query from where condition"""
+        table = config["sql_server"]["table"]
+        column = config["sql_server"]["column"]
+        # end=None
+        try:
+            if end is not None and condition.lower() == "between":
+                query = f"SELECT * from {table} where {column} {condition} '{start}'and '{end}' Order By {column} asc"
+                response = self.get_employee_details_by_joiningdate(query)
+            elif end is None and condition.lower() != "between":
+                query = f"SELECT * FROM {table}  WHERE {column} {condition} '{start}' Order By {column} asc"
+                response = self.get_employee_details_by_joiningdate(query)
+            else:
+                print("Cannot get the data for the given condition", condition)
+                self.logger.info("Cannot get the data for the given condition")
+                response = None
+        except Exception as err:
+            print("Cannot get the query", err)
+            self.logger.info("Cannot execute the query")
+            response = None
+        return response
