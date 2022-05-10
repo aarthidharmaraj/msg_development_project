@@ -13,14 +13,11 @@ class EmployeeDetailsPartitionLocalUpload:
 
     def __init__(self, logger):
         self.logger = logger
-        self.local_sqlpath = os.path.join(
-            parent_dir, config["sql_employee_details_joiningdate"]["local_file_path"]
-        )
 
-    def upload_parition_s3_local(self, copy_source, file_name, partition_path):
+    def upload_parition_s3_local(self, local_sqlpath, copy_source, file_name, partition_path):
         """This method uploads weatherdata in the partition path in the form of json"""
         try:
-            new_dir = self.local_sqlpath + "/" + partition_path + "/"
+            new_dir = local_sqlpath + "/" + partition_path + "/"
             if not os.path.exists(new_dir):
                 os.makedirs(new_dir)
             shutil.copy(copy_source, new_dir)
