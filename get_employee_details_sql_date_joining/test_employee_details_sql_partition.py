@@ -7,9 +7,9 @@ from datetime import datetime
 from time import time
 import pytest
 import pandas as pd
-from employee_details_sql_partition_s3 import EmployeeDetailsJoiningDate, valid_date
+from employee_details_sql_partition_s3 import EmployeeDetailsPartitionS3, valid_date
 from employee_details_upload_local import EmployeeDetailsPartitionLocalUpload
-from get_employee_details_sql import GetEmployeeFromSql
+from get_employee_details_sql import EmployeeFromSql
 from aws_s3.s3_details import S3Details
 
 parent_dir = os.path.dirname(os.getcwd())
@@ -207,13 +207,13 @@ class TestGetDetailsFromSql:
     """This class tests for possible testcases in get employee details from sql module"""
 
     def test_get_details_object(self):
-        """This tests for the instance belong to the class GetEmployeeFromSql"""
-        self.sql = GetEmployeeFromSql(logger_obj)
-        assert isinstance(self.sql, GetEmployeeFromSql)
+        """This tests for the instance belong to the class EmployeeFromSql"""
+        self.sql = EmployeeFromSql(logger_obj)
+        assert isinstance(self.sql, EmployeeFromSql)
 
     def test_sql_server_connection_established(self, sql_server):
         """This method tests the server is connected successfully"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         client = sql_server
         conn = self.sql.sql_connection(
             client["driver"], client["host"], client["database"], client["user"], client["password"]
@@ -223,7 +223,7 @@ class TestGetDetailsFromSql:
     @pytest.mark.xfail
     def test_sql_server_connection_not_established(self, sql_server_fail):
         """This method tests for server connection failure"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         client = sql_server_fail
         conn = self.sql.sql_connection(
             client["driver"], client["host"], client["database"], client["user"], client["password"]
@@ -232,9 +232,9 @@ class TestGetDetailsFromSql:
 
     def test_get_employee_details_by_joiningdate_isdone(self, sql_server, query):
         """This method tests to read from sql using pandas"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         client = sql_server
-        conn = self.sql.get_employee_details_by_joiningdate(
+        response = self.sql.get_employee_details_by_joiningdate(
             client["driver"],
             client["host"],
             client["database"],
@@ -242,14 +242,14 @@ class TestGetDetailsFromSql:
             client["password"],
             query,
         )
-        assert conn is not None
+        assert response is not None
 
     @pytest.mark.xfail
     def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server_fail, query):
         """This method tests for failure case to read from sql using pandas"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         client = sql_server_fail
-        conn = self.sql.get_employee_details_by_joiningdate(
+        resposne = self.sql.get_employee_details_by_joiningdate(
             client["driver"],
             client["host"],
             client["database"],
@@ -257,14 +257,14 @@ class TestGetDetailsFromSql:
             client["password"],
             query,
         )
-        assert conn is None
+        assert resposne is None
 
     def test_get_data_from_sql_passed_for_between(
         self, start_date, condition, end_date, table, column
     ):
         """This method tests for pulling employee details based on
         joining dates for between condition"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         get_query = self.sql.get_query_from_where_condition(
             start_date, condition, end_date, table, column
         )
@@ -276,7 +276,7 @@ class TestGetDetailsFromSql:
     ):
         """This method tests failure case for pulling employee details based
         on joining dates for between condition"""
-        self.obj_pullapi = GetEmployeeFromSql(logger_obj)
+        self.obj_pullapi = EmployeeFromSql(logger_obj)
         get_query = self.sql.get_query_from_where_condition(
             start_date, condition, end_date, table, column
         )
@@ -287,7 +287,7 @@ class TestGetDetailsFromSql:
     ):
         """This method tests for pulling employee details based on
         joining dates for conditions other than between"""
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         enddate = None
         get_query = self.sql.get_query_from_where_condition(
             start_date, condition_not_between, enddate, table, column
@@ -300,7 +300,7 @@ class TestGetDetailsFromSql:
     ):
         """This method tests failure case for pulling employee details
         based on joining dates for conditions other than between"""
-        self.obj_pullapi = GetEmployeeFromSql(logger_obj)
+        self.obj_pullapi = EmployeeFromSql(logger_obj)
         enddate = None
         get_query = self.sql.get_query_from_where_condition(
             start_date, condition_not_between, enddate, table, column
@@ -313,13 +313,13 @@ class TestEmployeeDetailsPartition:
     employee details sql partition s3 module"""
 
     def test_pull_metaweather_sql_objects(self, start_date, end_date, condition):
-        """This tests for the instance belong to the class EmployeeDetailsJoiningDate"""
-        self.obj_sqlapi = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
-        assert isinstance(self.obj_sqlapi, EmployeeDetailsJoiningDate)
+        """This tests for the instance belong to the class EmployeeDetailsPartitionS3"""
+        self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
+        assert isinstance(self.obj_sqlapi, EmployeeDetailsPartitionS3)
 
     def test_metaweather_data_for_givendates_passed(self, start_date, end_date, condition):
         """This methods tests the days between the given dates"""
-        self.obj_sqlapi = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
+        self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         date = self.obj_sqlapi.employee_details_from_sql()
         # assert date is not None
         assert not isinstance(date, datetime)
@@ -327,13 +327,13 @@ class TestEmployeeDetailsPartition:
     @pytest.mark.xfail
     def test_metaweather_data_for_givendates_failed(self, start_date, end_date):
         """This methods tests failed case for days between the given dates"""
-        self.obj_sql = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date)
         date = self.obj_sql.employee_details_from_sql()
         assert isinstance(date, datetime)
 
     def test_filter_create_response_by_date_isdone(self, start_date, end_date, condition, response):
         """This method tests for filtering the response from sql based on dates"""
-        self.obj_sql = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         result = self.obj_sql.filter_create_response_by_date(response, start_date)
         assert result == f"employee_{int(time())}.json"
 
@@ -342,13 +342,13 @@ class TestEmployeeDetailsPartition:
         self, start_date, end_date, condition, response
     ):
         """This method tests failure case for filtering the response from sql based on dates"""
-        self.obj_sql = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         result = self.obj_sql.filter_create_response_by_date(response, start_date)
         assert result == None
 
     def test_put_partition_path_isdone(self, start_date, end_date, condition):
         """This method tests for giving the partition path based on year,month,date"""
-        self.obj_sql = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         response = self.obj_sql.put_partition_path(start_date)
         assert response == "pt_year=2022/pt_month=05/pt_day=08"
 
@@ -356,7 +356,7 @@ class TestEmployeeDetailsPartition:
     def test_put_partition_path_is_notdone(self, start_date, end_date, condition):
         """This method tests failure case for giving the partition path
         based on year,month,date"""
-        self.obj_sql = EmployeeDetailsJoiningDate(logger_obj, start_date, end_date, condition)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         response = self.obj_sql.put_partition_path(start_date)
         assert response is None
 
