@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime, timedelta
 import sys
 from time import time
-from get_employee_details_sql import GetEmployeeFromSql
+from get_employee_details_sql import EmployeeFromSql
 from employee_details_upload_local import EmployeeDetailsPartitionLocalUpload
 # from aws_s3.s3_details import S3Details
 
@@ -18,7 +18,7 @@ config = configparser.ConfigParser()
 config.read(parent_dir + "/details.ini")
 
 
-class EmployeeDetailsJoiningDate:
+class EmployeeDetailsPartitionS3:
     """This class gets employees details based on joiningdate and upload to s3"""
 
     def __init__(self, logger_obj, startdate, enddate, condition):
@@ -33,22 +33,29 @@ class EmployeeDetailsJoiningDate:
         if not os.path.exists(self.local_sqlpath):
             os.makedirs(self.local_sqlpath)
         self.local = EmployeeDetailsPartitionLocalUpload(logger_obj)
-        self.sql = GetEmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         # self.s3_client = S3Details(logger_obj)
 
     def get_employee_details_for_givendates(self):
         """This method is to get the employee details for the given dates"""
-        if self.startdate <= (datetime.now().date()-timedelta(days=1)):
-            if self.startdate < self.enddate:
-                dates = {"date1": self.startdate, "date2": self.enddate}
+        if self.enddate:
+            if self.startdate >= (datetime.now().date()) or self.enddate >=(datetime.now().date()):
+                self.logger.info("Cannot fetch the details for future dates")
+                sys.exit("script was terminated when fetching for future dates")
             else:
-                self.logger.info("Cannot fetch details as startdate is greater than enddate")
-                sys.exit("script was terminated since startdate is greater than enddate")
-            self.logger.info("Filtering Employee details from given startdate to enddate")
-            print("Filtering Employee details from given startdate to enddate")
+                if self.startdate < self.enddate:
+                    dates = {"date1": self.startdate, "date2": self.enddate}
+                else:
+                    self.logger.info("Cannot fetch details as startdate is greater than enddate")
+                    sys.exit("script was terminated since startdate is greater than enddate")
+                self.logger.info("Filtering Employee details from given startdate to enddate")
+                print("Filtering Employee details from given startdate to enddate")
         else:
-            self.logger.info("Cannot fetch the details for future dates")
-            sys.exit("script was terminated when fetching for future dates")
+            if self.startdate >= (datetime.now().date()):
+                self.logger.info("Cannot fetch the details for future dates")
+                sys.exit("script was terminated when fetching for future dates")   
+            else:
+                dates = {"date1": self.startdate, "date2": None} 
         return dates
 
     def employee_details_from_sql(self):
@@ -59,11 +66,10 @@ class EmployeeDetailsJoiningDate:
         )
         # print(response)
         if response is not None:
-            day_count = (dates["date2"] - dates["date1"]).days + 1
-            for day in range(day_count):
-                single_date = dates["date1"] + timedelta(day)
-                self.logger.info("Filtering the response based on dates")
+            single_date = min(response["Date_of_Joining"])
+            while single_date <= max(response["Date_of_Joining"]):
                 self.filter_create_response_by_date(response, single_date)
+                single_date = single_date + timedelta(1)
         else:
             self.logger.error("Cannot fetch the data from sql due to problem in sql")
             single_date=None
@@ -112,8 +118,8 @@ class EmployeeDetailsJoiningDate:
         key = partition_path + "/" + file_name
         self.logger.info("The file is being uploaded to s3 in the given path")
         print("the file has been uploaded to s3 in the given path")
-        self.s3_client.upload_file(source, key)
-
+        # self.s3_client.upload_file(source, key)
+        os.remove(source)
 
 def valid_date(date):
     """This method checks for the valid date entered and returns in datetime.date() format"""
@@ -152,7 +158,6 @@ def main():
         "--enddate",
         help="The date should be in - format YYYY-MM-DD",
         type=valid_date,
-        default=datetime.now().date(),
     )
     parser.add_argument(
         "--condition",
@@ -161,7 +166,7 @@ def main():
         default=config["sql_employee_details_joiningdate"]["where_condition"],
     )
     args = parser.parse_args()
-    employee_details = EmployeeDetailsJoiningDate(
+    employee_details = EmployeeDetailsPartitionS3(
         logger_obj, args.startdate, args.enddate, args.condition
     )
     employee_details.employee_details_from_sql()
