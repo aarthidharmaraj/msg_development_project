@@ -21,6 +21,7 @@ class EmployeeDetailsPartitionLocalUpload:
             if not os.path.exists(new_dir):
                 os.makedirs(new_dir)
             shutil.copy(copy_source, new_dir)
+            os.remove(copy_source)
             print("Successfully created json file in the given path\n")
             self.logger.info("Successfully created json file in the given path")
 
