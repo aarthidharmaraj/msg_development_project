@@ -44,6 +44,10 @@ def end_date():
     enddate = "2022-05-10"
     return datetime.strptime(enddate, "%Y-%m-%d").date()
 
+@pytest.fixture
+def date_none():
+    """This method returns the date as none"""
+    return None
 
 @pytest.fixture
 def file_name():
@@ -122,6 +126,16 @@ def column():
     """This method returns the colummn to fetch required datas"""
     return "Date_of_Joining"
 
+@pytest.fixture
+def false_table():
+    """This method returns the table for fetching datas"""
+    return "employeess"
+
+
+@pytest.fixture
+def false_column():
+    """This method returns the colummn to fetch required datas"""
+    return "joining_date"
 
 def sql_server_fail():
     """This method returns the server credentials for fail connect to server"""
@@ -146,6 +160,11 @@ def query(table, column, condition, start_date, end_date):
     query = f"SELECT * from {table} where {column} {condition} '{start_date}'and '{end_date}'"
     return query
 
+@pytest.fixture
+def query_fail(false_table,false_column,condition,start_date,end_date):
+    """This method returns the false query to check"""
+    query = f"SELECT * from {false_table} where {false_column} {condition} '{start_date}'and '{end_date}'"
+    return query
 
 class TestS3Details:
     """This Test Class will check for all the possible
@@ -245,10 +264,10 @@ class TestGetDetailsFromSql:
         assert response is not None
 
     @pytest.mark.xfail
-    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server_fail, query):
+    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server,query):
         """This method tests for failure case to read from sql using pandas"""
         self.sql = EmployeeFromSql(logger_obj)
-        client = sql_server_fail
+        client = sql_server
         resposne = self.sql.get_employee_details_by_joiningdate(
             client["driver"],
             client["host"],
@@ -283,27 +302,25 @@ class TestGetDetailsFromSql:
         assert get_query is None
 
     def test_get_data_from_sql_passed_for_notbetween(
-        self, start_date, condition_not_between, table, column
+        self, start_date, condition_not_between, table,date_none, column
     ):
         """This method tests for pulling employee details based on
         joining dates for conditions other than between"""
         self.sql = EmployeeFromSql(logger_obj)
-        enddate = None
         get_query = self.sql.get_query_from_where_condition(
-            start_date, condition_not_between, enddate, table, column
+            start_date, condition_not_between,date_none, table, column
         )
         assert get_query is not None
 
     @pytest.mark.xfail
     def test_get_data_from_sql_failed_for_notbetween(
-        self, start_date, condition_not_between, table, column
+        self, start_date, condition_not_between, table, column,enddate
     ):
         """This method tests failure case for pulling employee details
         based on joining dates for conditions other than between"""
         self.obj_pullapi = EmployeeFromSql(logger_obj)
-        enddate = None
         get_query = self.sql.get_query_from_where_condition(
-            start_date, condition_not_between, enddate, table, column
+            start_date, condition_not_between,end_date, table, column
         )
         assert get_query is None
 
@@ -317,7 +334,7 @@ class TestEmployeeDetailsPartition:
         self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         assert isinstance(self.obj_sqlapi, EmployeeDetailsPartitionS3)
 
-    def test_metaweather_data_for_givendates_passed(self, start_date, end_date, condition):
+    def test_employee_data_for_givendates_passed(self, start_date, end_date, condition):
         """This methods tests the days between the given dates"""
         self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         date = self.obj_sqlapi.employee_details_from_sql()
@@ -325,9 +342,9 @@ class TestEmployeeDetailsPartition:
         assert not isinstance(date, datetime)
 
     @pytest.mark.xfail
-    def test_metaweather_data_for_givendates_failed(self, start_date, end_date):
+    def test_employee_data_for_givendates_failed(self, start_date, date_none,condition):
         """This methods tests failed case for days between the given dates"""
-        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date,date_none,condition)
         date = self.obj_sql.employee_details_from_sql()
         assert isinstance(date, datetime)
 
