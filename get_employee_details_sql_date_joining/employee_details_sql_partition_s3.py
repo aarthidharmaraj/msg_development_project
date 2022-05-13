@@ -65,7 +65,7 @@ class EmployeeDetailsPartitionS3:
             dates["date1"], self.condition, dates["date2"]
         )
         # print(response)
-        if response is not None:
+        if response is not None and not response.empty:
             single_date = min(response["Date_of_Joining"])
             while single_date <= max(response["Date_of_Joining"]):
                 self.filter_create_response_by_date(response, single_date)
@@ -73,7 +73,7 @@ class EmployeeDetailsPartitionS3:
         else:
             self.logger.error("Cannot fetch the data from sql due to problem in sql")
             single_date=None
-            sys.exit("The script has terminated due to problem in sql")
+            sys.exit("The script has terminated due to problem in sql or matching datas are not found")
         return single_date
     
     def filter_create_response_by_date(self, df_data, date):
