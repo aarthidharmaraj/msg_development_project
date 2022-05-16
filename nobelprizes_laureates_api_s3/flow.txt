@@ -1,0 +1,54 @@
+Fetch Nobel Prizes & Nobel Laureates year-wise and upload it to the following 
+path with partition based on year of nobel prize being awarded.
+s3://msg-practice-induction/nobel/source/prize/pt_year
+s3://msg-practice-induction/nobel/source/laureate/pt_year
+
+Here is the link to the API documentation: 
+https://app.swaggerhub.com/apis/NobelMedia/NobelMasterData/2.0#/
+
+
+There should be only one file in the prize partition for a year that contains the prize 
+details for all the 6 prize categories. Similarly there should be only one 
+file in the laureate partition for a year.Your script should not create duplicate 
+files but should overwrite the existing file when it is run for
+already fetched year.
+
+Use HTTPS schemes and not http. Handle all the response codes with appropriate messages.
+
+As usual provide facility to fetch specific year & year ranges and 
+specific endpoint - prize & laureate.
+
+Go through the documentation & try out the API endpoints and then get your 
+doubts clarified, if any.
+
+Analysis:
+
+Gone through the API documentation provided and 
+analzed on the task requirements
+
+Base URL
+[ Base URL: api.nobelprize.org/2.0 ]
+
+1. Used Postman to get the results from api for nobel prizes between start and end year for all categories in json and csv
+HTTPs://api.nobelprize.org/2.0/nobelPrizes?offset=1&sort=asc&nobelPrizeYear=2019&yearTo=2022&format=csv
+
+ HTTPs://api.nobelprize.org/2.0/nobelPrizes?nobelPrizeYear=2019&yearTo=2022&format=csv
+
+ https://api.nobelprize.org/2.0/nobelPrizes?sort=asc&nobelPrizeYear=2019&yearTo=2022&format=csv
+
+2. Used Postman to get results for a single year
+https://api.nobelprize.org/2.0/nobelPrizes?nobelPrizeYear=2019&format=csv
+
+
+For Laureates generally
+https://api.nobelprize.org/2.0/laureates?format=csv
+
+based on start and end years
+https://api.nobelprize.org/2.0/laureates?nobelPrizeYear=2019&yearTo=2022&format=csv
+
+3. Use the api with provided years and format to download 
+
+4. Get the response and make parttion for nobel prizes and laureates separately
+
+5. Upload them in local and in s3
+
