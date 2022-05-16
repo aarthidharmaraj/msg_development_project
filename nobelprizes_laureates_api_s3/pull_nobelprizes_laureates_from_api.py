@@ -1,5 +1,5 @@
 """This module fetches the nobel prize and laureates data from api 
-"https://api.nobelprize.org/2.0/" and return the responses """
+"https://api.nobelprize.org/2.0/" and return the response """
 
 import os
 import configparser
