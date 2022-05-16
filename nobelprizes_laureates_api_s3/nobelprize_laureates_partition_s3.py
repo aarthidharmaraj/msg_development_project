@@ -1,5 +1,5 @@
 """ This module fetches the nobel prizes and laureates based on given year 
-from api,partition them based on year and upload to s3 in that path"""
+from api,partition them based on year and upload to s3 in that partition_path"""
 
 import logging
 import configparser
