@@ -1,4 +1,4 @@
-"""This module contains script for uploading data in json format in partiton path"""
+"""This module contains script for uploading data in json format in partiton path in local"""
 import os
 import configparser
 import shutil
