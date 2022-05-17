@@ -38,65 +38,90 @@ class NobelPrizeLaureatesPartitionS3:
         self.api = NobelprizeLaureatesFromApi(logger_obj)
         # self.s3_client = S3Details(logger_obj)
 
-    def fetch_nobel_prize_details_from_api(self):
-        """This method fetches the nobel prize details from the api for the given year"""
-        pull_for = "nobelPrizes"
-        response = self.api.pull_nobelprizes_laureates_from_api(
-            pull_for, self.startyear, self.endyear
-        )
-        if response is not None:
-            df_data = pd.DataFrame(response["nobelPrizes"])
-            # print(df_data)
-            self.create_dataframe_for_each_year(df_data, pull_for)
-        else:
-            self.logger.info("System gets terminated due to no nobelprize response from api")
-            sys.exit("System terminated while getting nobelprize response from api")
-
-    def fetch_laureate_details_from_api(self):
-        """This method fetches the Laureate details from the api for the given year"""
-        pull_for = "laureates"
-        response = self.api.pull_nobelprizes_laureates_from_api(
-            pull_for, self.startyear, self.endyear
-        )
-        if response is not None:
-            # print(response)
-            df_data = pd.DataFrame(response["laureates"])
-            self.create_dataframe_for_each_year(df_data, pull_for)
-        else:
-            self.logger.info("System gets terminated due to no laureate response from api")
-            sys.exit("System terminated while getting laureate response from api")
-
-    def create_dataframe_for_each_year(self, df_data, pull_for):
-        """This method create dataframe for each year"""
-        while self.startyear <= self.endyear:
-            new_data = self.filter_create_response_by_year(df_data, self.startyear, pull_for)
-            self.create_json_file_partition(new_data, self.startyear, pull_for)
-            self.startyear = self.startyear + 1
-
-    def filter_create_response_by_year(self, df_data, year, pull_for):
-        """This method filters and creates a newdataframe from the response
-        based on year using pandas"""
+    def fetch_nobelprize_laureate_from_api_each_year(self, pull_for):
+        """This method fetches the nobel prize and laureates details from the api
+        for each year between the given years"""
+        # print(pull_for)
+        years_list = []
         try:
-            if pull_for == "nobelPrizes":
-                new_df = df_data[(df_data["awardYear"].str.contains(str(year)))]
-                if not new_df.empty:
-                    new_dataframe = new_df
+            if self.endyear:
+                for get_year in range(self.startyear, self.endyear + 1):
+                    years_list.append(get_year)
             else:
-                for year in df_data["nobelPrizes"]:
-                    print(year)
-                    new_dataframe = None
+                years_list.append(self.startyear)
+            years_list.append(pull_for)
         except Exception as err:
-            print("Cannot filter the datas in dataframe due to this error:", err)
-            self.logger.error("Cannot filter the datas in dataframe due to an error")
-            new_dataframe = None
-        return new_dataframe
+            self.logger.error("Canno get the resposnse from the given list of years")
+            print(err)
+            years_list = None
+        return years_list
 
-    def create_json_file_partition(self, new_df, year, pull_for):
+    # def fetch_nobel_prize_details_from_api(self):
+    # """This method fetches the nobel prize details from the api for each year between the given years"""
+    # pull_for = "nobelPrizes"
+    # years_list=[]
+    # try:
+    #     if self.endyear:
+    #         for get_year in range(self.startyear,self.endyear+1):
+    #             years_list.append(get_year)
+    #     else:
+    #         years_list.append(self.startyear)
+    #     self.get_response_from_api(pull_for,years_list)
+    # except Exception as err:
+    #     self.logger.error("Canno get the resposnse from the given list of years")
+    #     print(err)
+    #     years_list=None
+    # return years_list
+
+    # def fetch_laureate_details_from_api(self):
+    #     """This method fetches the Laureate details from the api for the given year"""
+    #     pull_for = "laureates"
+    #     years_list=[]
+    #     try:
+    #         if self.endyear:
+    #             for get_year in range(self.startyear,self.endyear+1):
+    #                 years_list.append(get_year)
+    #     else:
+    #         years_list.append(self.startyear)
+    #     self.get_response_from_api(pull_for,years_list)
+    # except Exception as err:
+    #     self.logger.error("Canno get the resposnse from the given list of years")
+    #     print(err)
+    #     years_list=None
+    # return years_list
+
+    def get_response_from_api(self, pull_for, years_list):
+        """This method gets the nobel prizes and laureates response from api
+        and convert to a dataframe using pandas"""
+        try:
+            for year in years_list:
+                response = self.api.pull_nobelprizes_laureates_from_api(pull_for, year)
+                if response is not None:
+                    if pull_for == "nobelPrizes":
+                        df_data = pd.DataFrame(response["nobelPrizes"])
+                    else:
+                        df_data = pd.DataFrame(response["laureates"])
+                    if not df_data.empty:
+                        self.create_json_file_partition(df_data, year, pull_for)
+                else:
+                    self.logger.info("No responses from api")
+                    df_data = None
+                    sys.exit(
+                        "System terminated while getting nobelprize or laureate response from api"
+                    )
+
+        except Exception:
+            self.logger.info("Cannot able to get response from api")
+            df_data = None
+            sys.exit("System has terminated while getting nobelprize or laureate response from api")
+        return df_data
+
+    def create_json_file_partition(self, df_data, year, pull_for):
         """This method creates a temporary json file,create partition path and upload to s3"""
         try:
             epoch = int(time())
             file_name = f"{pull_for}_{epoch}.json"
-            new_df.to_json(self.local_path + "/" + file_name, orient="records", lines=True)
+            df_data.to_json(self.local_path + "/" + file_name, orient="records", lines=True)
             partition_path = self.put_partition_path(year, pull_for)
             copy_source = self.local_path + "/" + file_name
             file_name = self.local.upload_parition_s3_local(
@@ -105,7 +130,9 @@ class NobelPrizeLaureatesPartitionS3:
             # self.upload_to_s3(copy_source,partition_path, file_name)
         except Exception as err:
             self.logger.error("Cannot create a json file")
-            print("Canot create a json file",err)
+            print("Canot create a json file", err)
+            file_name = None
+        return file_name
 
     def put_partition_path(self, year, pull_for):
         """This method will make partion path based on year
@@ -113,10 +140,10 @@ class NobelPrizeLaureatesPartitionS3:
         try:
             if pull_for == "nobelPrizes":
                 partition_path = f"nobel/source/prize/pt_year={year}"
-                # print(partition_path)
+                print(partition_path)
             else:
                 partition_path = f"nobel/source/laureate/pt_year={year}"
-                # print(partition_path)
+                print(partition_path)
 
         except Exception as err:
             self.logger.error("Cannot made a parttiion")
@@ -151,17 +178,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="This argparser is to get the required date_of_joining need to filter"
     )
-    parser.add_argument("--fromyear", help="Enter the start year YYYY", type=int, default=1901)
     parser.add_argument(
-        "--toyear",
-        help="Enter the end year YYYY",
+        "--fromyear",
+        help="Enter the start year YYYY",
         type=int,
         default=int(datetime.now().date().strftime("%Y")) - 1,
     )
+    parser.add_argument("--toyear", help="Enter the end year YYYY", type=int)
     args = parser.parse_args()
     api_details = NobelPrizeLaureatesPartitionS3(logger_obj, args.fromyear, args.toyear)
     # api_details.fetch_nobel_prize_details_from_api()
-    api_details.fetch_laureate_details_from_api()
+    # api_details.fetch_laureate_details_from_api()
+    list_year = api_details.fetch_nobelprize_laureate_from_api_each_year(pull_for="nobelPrizes")
+    api_details.get_response_from_api(list_year[-1], list_year[:-1])
+    list_year = api_details.fetch_nobelprize_laureate_from_api_each_year(pull_for="laureates")
+    api_details.get_response_from_api(list_year[-1], list_year[:-1])
 
 
 if __name__ == "__main__":
