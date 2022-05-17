@@ -21,22 +21,11 @@ class EmployeeFromSql:
 
     def sql_connection(self, driver, host, database, user, password):
         """This method is to connect the sql server using pyodbc"""
-        for drivers in pyodbc.drivers():
-            print(drivers)
         try:
-            conn = pyodbc.connect(
-                Driver=driver,
-                host=host,
-                database=database,
-                user=user,
-                password=password,
-                trusted_connection=YES,
-                autocommit=True,
-            )
-            # connection_string=config["sql_server"]["connection_string"]
-            # print(connection_string)
-            # connection_url=URL.create("mssql+pyodbc",query={"odbc_connect":connection_string})
-            # conn=create_engine(connection_url)
+            connection_string = f"DRIVER={driver};SERVER={host};DATABASE={database};UID={user};PWD={password}"
+            print(connection_string)
+            connection_url=URL.create("mssql+pyodbc",query={"odbc_connect":connection_string})
+            conn=create_engine(connection_url)
             self.logger.info("The connection has been established successfuly")
         except Exception as err:
             self.logger.info("Cannot connect to server")
@@ -50,7 +39,7 @@ class EmployeeFromSql:
             conn = self.sql_connection(driver, host, database, user, password)
             chunk_data = pd.read_sql(query, conn, chunksize=1000)
             df_data = pd.concat(chunk_data)
-            print(df_data)
+            # print(df_data)
         except Exception as err:
             print("Cannot filter the employee details for given date", err)
             self.logger.error("Cannot filter the employee details for given date")
@@ -61,9 +50,9 @@ class EmployeeFromSql:
         """This method gets the query from where condition"""
         try:
             if end is not None and condition.lower() == "between":
-                query = f"SELECT * from {table} where {column} {condition} '{start}'and '{end}' Order By {column} asc"
+                query = f"SELECT * from {table} where {column} {condition} '{start}'and '{end}' "
             elif end is None and condition in ["<","<=",">=","=",">"]:
-                query = f"SELECT * FROM {table}  WHERE {column} {condition} '{start}' Order By {column} asc"
+                query = f"SELECT * FROM {table}  WHERE {column} {condition} '{start}' "
             else:
                 self.logger.info("Cannot get the data for the given condition")
                 query = None
