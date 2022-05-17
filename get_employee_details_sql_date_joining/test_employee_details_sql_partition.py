@@ -100,9 +100,9 @@ def response():
 @pytest.fixture
 def sql_server():
     """This method returns the server credentials to connect to server"""
-    driver = "{MySQL ODBC 8.0 Unicode Driver}"
+    driver = "{ODBC Driver 17 for SQL Server}"
     host = "localhost"
-    user = "root"
+    user = "SA"
     password = "Aspire@123"
     database = "Employee_payroll"
     client = {
@@ -264,10 +264,10 @@ class TestGetDetailsFromSql:
         assert response is not None
 
     @pytest.mark.xfail
-    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server,query):
+    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server_fail,query):
         """This method tests for failure case to read from sql using pandas"""
         self.sql = EmployeeFromSql(logger_obj)
-        client = sql_server
+        client = sql_server_fail
         resposne = self.sql.get_employee_details_by_joiningdate(
             client["driver"],
             client["host"],
@@ -333,20 +333,6 @@ class TestEmployeeDetailsPartition:
         """This tests for the instance belong to the class EmployeeDetailsPartitionS3"""
         self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
         assert isinstance(self.obj_sqlapi, EmployeeDetailsPartitionS3)
-
-    def test_employee_data_for_givendates_passed(self, start_date, end_date, condition):
-        """This methods tests the days between the given dates"""
-        self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
-        date = self.obj_sqlapi.employee_details_from_sql()
-        # assert date is not None
-        assert not isinstance(date, datetime)
-
-    @pytest.mark.xfail
-    def test_employee_data_for_givendates_failed(self, start_date, date_none,condition):
-        """This methods tests failed case for days between the given dates"""
-        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date,date_none,condition)
-        date = self.obj_sql.employee_details_from_sql()
-        assert isinstance(date, datetime)
 
     def test_filter_create_response_by_date_isdone(self, start_date, end_date, condition, response):
         """This method tests for filtering the response from sql based on dates"""
