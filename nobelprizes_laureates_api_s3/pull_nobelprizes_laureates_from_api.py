@@ -4,7 +4,6 @@
 import os
 import configparser
 import requests
-# import pandas as pd
 
 parent_dir = os.path.dirname(os.getcwd())
 config = configparser.ConfigParser()
@@ -20,19 +19,20 @@ class NobelprizeLaureatesFromApi:
         self.logger = logger
         self.base_url = config["nobelprize_laureates_api"]["basic_url"]
 
-    def pull_nobelprizes_laureates_from_api(self, pull_for, startyear, endyear):
+    def pull_nobelprizes_laureates_from_api(self, pull_for, year):
         """This method pulls the response for Nobel prizes from the api"""
         try:
 
-            endpoint = f"{pull_for}?nobelPrizeYear={startyear}&yearTo={endyear}"
+            endpoint = f"{pull_for}?nobelPrizeYear={year}"
             request_url = self.base_url + endpoint
-            # print(request_url)
-            response = requests.get(request_url).json()
-            # print(response)
-            # df_data=pd.DataFrame(response['laureates'])
-            # print(df_data)
+            response = requests.get(request_url)
+            if response.status_code == 200:
+                response = response.json()
+            else:
+                print("It gives a failure response with code", response.status_code)
+                response = None
         except Exception as err:
             self.logger.info("Cannot get the response from api due to problem in api")
-            print("No response from api",err)
+            print("No response from api", err)
             response = None
         return response
