@@ -30,9 +30,10 @@ class NobelprizeLaureatesFromApi:
                 response = response.json()
             else:
                 print("It gives a failure response with code", response.status_code)
+                self.logger.error(f"It gives a failure response with code{response.status_code}")
                 response = None
         except Exception as err:
-            self.logger.info("Cannot get the response from api due to problem in api")
+            self.logger.error(f"Cannot get the response from api due to problem in api{err}")
             print("No response from api", err)
             response = None
         return response
