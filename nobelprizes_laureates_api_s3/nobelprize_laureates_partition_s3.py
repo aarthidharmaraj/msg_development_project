@@ -24,12 +24,12 @@ class NobelPrizeLaureatesPartitionS3:
     from api,filter and create dataframe based on year and
     partition them on year and upload to s3"""
 
-    def __init__(self, logger_obj, startyear, endyear,endpoint):
+    def __init__(self, logger_obj, startyear, endyear, endpoint):
         """This is the init method for the class NobelPrizeLaureatesPartitionS3"""
         self.logger = logger_obj
         self.startyear = startyear
         self.endyear = endyear
-        self.endpoint=endpoint
+        self.endpoint = endpoint
         self.local_path = os.path.join(
             parent_dir, config["local"]["data_path"], "nobel_laureates_data"
         )
@@ -57,47 +57,13 @@ class NobelPrizeLaureatesPartitionS3:
             years_list = None
         return years_list
 
-    # def fetch_nobel_prize_details_from_api(self):
-    # """This method fetches the nobel prize details from the api for each year between the given years"""
-    # pull_for = "nobelPrizes"
-    # years_list=[]
-    # try:
-    #     if self.endyear:
-    #         for get_year in range(self.startyear,self.endyear+1):
-    #             years_list.append(get_year)
-    #     else:
-    #         years_list.append(self.startyear)
-    #     self.get_response_from_api(pull_for,years_list)
-    # except Exception as err:
-    #     self.logger.error("Canno get the resposnse from the given list of years")
-    #     print(err)
-    #     years_list=None
-    # return years_list
-
-    # def fetch_laureate_details_from_api(self):
-    #     """This method fetches the Laureate details from the api for the given year"""
-    #     pull_for = "laureates"
-    #     years_list=[]
-    #     try:
-    #         if self.endyear:
-    #             for get_year in range(self.startyear,self.endyear+1):
-    #                 years_list.append(get_year)
-    #     else:
-    #         years_list.append(self.startyear)
-    #     self.get_response_from_api(pull_for,years_list)
-    # except Exception as err:
-    #     self.logger.error("Canno get the resposnse from the given list of years")
-    #     print(err)
-    #     years_list=None
-    # return years_list
-
     def get_response_from_api(self, years_list):
         """This method gets the nobel prizes and laureates response from api
         and convert to a dataframe using pandas"""
         try:
             for year in years_list:
                 print(year)
-                response = self.api.pull_nobelprizes_laureates_from_api(self.endpoint,year)
+                response = self.api.pull_nobelprizes_laureates_from_api(self.endpoint, year)
                 if response is not None:
                     self.logger.info(f"Got the response from api for the year {year}")
                     if self.endpoint == "nobelPrizes":
@@ -116,10 +82,16 @@ class NobelPrizeLaureatesPartitionS3:
         except Exception as err:
             self.logger.error(f"Cannot able to get response from api{err}")
             df_data = None
-            sys.exit("System has terminated for fail in getting nobelprize or laureate response from api")
+            sys.exit(
+                "System has terminated for fail in getting nobelprize or laureate response from api"
+            )
         return df_data
 
-    def create_json_file_partition(self, df_data, award_year,):
+    def create_json_file_partition(
+        self,
+        df_data,
+        award_year,
+    ):
         """This method creates a temporary json file,create partition path and upload to s3"""
         try:
             file_name = f"pull_for_{award_year}.json"
@@ -161,6 +133,7 @@ class NobelPrizeLaureatesPartitionS3:
         self.s3_client.upload_file(source, key)
         os.remove(source)
 
+
 # def valid_endpoint(endpoint):
 #     """This method checks for the valid endpoint"""
 #     try:
@@ -171,6 +144,7 @@ class NobelPrizeLaureatesPartitionS3:
 #     except ValueError:
 #         msg = f"Not a valid endpoint.It must be either nobelPrizes or laureates"
 #         raise argparse.ArgumentTypeError(msg)
+
 
 def main():
     """This is the main method for this module"""
@@ -197,9 +171,13 @@ def main():
         default=int(datetime.now().date().strftime("%Y")) - 1,
     )
     parser.add_argument("--toyear", help="Enter the end year YYYY", type=int)
-    parser.add_argument("--endpoint",choices=['nobelPrizes','laureates'],help="Enter the endpoint",required=True)
+    parser.add_argument(
+        "--endpoint", choices=["nobelPrizes", "laureates"], help="Enter the endpoint", required=True
+    )
     args = parser.parse_args()
-    api_details = NobelPrizeLaureatesPartitionS3(logger_obj, args.fromyear, args.toyear,args.endpoint)
+    api_details = NobelPrizeLaureatesPartitionS3(
+        logger_obj, args.fromyear, args.toyear, args.endpoint
+    )
     list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
     api_details.get_response_from_api(list_year)
     # list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
