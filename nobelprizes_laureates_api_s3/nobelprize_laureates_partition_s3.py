@@ -24,11 +24,12 @@ class NobelPrizeLaureatesPartitionS3:
     from api,filter and create dataframe based on year and
     partition them on year and upload to s3"""
 
-    def __init__(self, logger_obj, startyear, endyear):
+    def __init__(self, logger_obj, startyear, endyear,endpoint):
         """This is the init method for the class NobelPrizeLaureatesPartitionS3"""
         self.logger = logger_obj
         self.startyear = startyear
         self.endyear = endyear
+        self.endpoint=endpoint
         self.local_path = os.path.join(
             parent_dir, config["local"]["data_path"], "nobel_laureates_data"
         )
@@ -38,7 +39,7 @@ class NobelPrizeLaureatesPartitionS3:
         self.api = NobelprizeLaureatesFromApi(logger_obj)
         # self.s3_client = S3Details(logger_obj)
 
-    def fetch_nobelprize_laureate_from_api_each_year(self, pull_for):
+    def fetch_nobelprize_laureate_from_api_each_year(self):
         """This method fetches the nobel prize and laureates details from the api
         for each year between the given years"""
         # print(pull_for)
@@ -49,9 +50,9 @@ class NobelPrizeLaureatesPartitionS3:
                     years_list.append(get_year)
             else:
                 years_list.append(self.startyear)
-            years_list.append(pull_for)
+            # years_list.append(pull_for)
         except Exception as err:
-            self.logger.error("Canno get the resposnse from the given list of years")
+            self.logger.error(f"Cannot get the resposnse from the given list of years{err}")
             print(err)
             years_list = None
         return years_list
@@ -90,63 +91,64 @@ class NobelPrizeLaureatesPartitionS3:
     #     years_list=None
     # return years_list
 
-    def get_response_from_api(self, pull_for, years_list):
+    def get_response_from_api(self, years_list):
         """This method gets the nobel prizes and laureates response from api
         and convert to a dataframe using pandas"""
         try:
             for year in years_list:
-                response = self.api.pull_nobelprizes_laureates_from_api(pull_for, year)
+                print(year)
+                response = self.api.pull_nobelprizes_laureates_from_api(self.endpoint,year)
                 if response is not None:
-                    if pull_for == "nobelPrizes":
+                    self.logger.info(f"Got the response from api for the year {year}")
+                    if self.endpoint == "nobelPrizes":
                         df_data = pd.DataFrame(response["nobelPrizes"])
                     else:
                         df_data = pd.DataFrame(response["laureates"])
                     if not df_data.empty:
-                        self.create_json_file_partition(df_data, year, pull_for)
+                        self.create_json_file_partition(df_data, year)
                 else:
-                    self.logger.info("No responses from api")
+                    self.logger.info(f"No responses from api {response}")
                     df_data = None
                     sys.exit(
-                        "System terminated while getting nobelprize or laureate response from api"
+                        "System terminated for failed in getting nobelprize or laureate response from api"
                     )
 
-        except Exception:
-            self.logger.info("Cannot able to get response from api")
+        except Exception as err:
+            self.logger.error(f"Cannot able to get response from api{err}")
             df_data = None
-            sys.exit("System has terminated while getting nobelprize or laureate response from api")
+            sys.exit("System has terminated for fail in getting nobelprize or laureate response from api")
         return df_data
 
-    def create_json_file_partition(self, df_data, year, pull_for):
+    def create_json_file_partition(self, df_data, award_year,):
         """This method creates a temporary json file,create partition path and upload to s3"""
         try:
-            epoch = int(time())
-            file_name = f"{pull_for}_{epoch}.json"
+            file_name = f"pull_for_{award_year}.json"
             df_data.to_json(self.local_path + "/" + file_name, orient="records", lines=True)
-            partition_path = self.put_partition_path(year, pull_for)
+            partition_path = self.put_partition_path(award_year)
             copy_source = self.local_path + "/" + file_name
             file_name = self.local.upload_parition_s3_local(
                 self.local_path, copy_source, file_name, partition_path
             )
             # self.upload_to_s3(copy_source,partition_path, file_name)
         except Exception as err:
-            self.logger.error("Cannot create a json file")
+            self.logger.error(f"Cannot create a json file for{file_name}")
             print("Canot create a json file", err)
             file_name = None
         return file_name
 
-    def put_partition_path(self, year, pull_for):
+    def put_partition_path(self, award_year):
         """This method will make partion path based on year
         and avoid overwrite of file and upload to local"""
         try:
-            if pull_for == "nobelPrizes":
-                partition_path = f"nobel/source/prize/pt_year={year}"
+            if self.endpoint == "nobelPrizes":
+                partition_path = f"nobel/source/prize/pt_year={award_year}"
                 print(partition_path)
             else:
-                partition_path = f"nobel/source/laureate/pt_year={year}"
+                partition_path = f"nobel/source/laureate/pt_year={award_year}"
                 print(partition_path)
 
         except Exception as err:
-            self.logger.error("Cannot made a parttiion")
+            self.logger.error(f"Cannot made a partition becausee of {err}")
             print("Cannot made a partition because of this error", err)
             partition_path = None
         return partition_path
@@ -154,11 +156,21 @@ class NobelPrizeLaureatesPartitionS3:
     def upload_to_s3(self, source, partition_path, file_name):
         """This method used to upload the file to s3 in the partiton created"""
         key = partition_path + "/" + file_name
-        self.logger.info("The file is being uploaded to s3 in the given path")
+        self.logger.info(f"The file is {file_name} being uploaded to s3 in the given path")
         print("the file has been uploaded to s3 in the given path")
         self.s3_client.upload_file(source, key)
         os.remove(source)
 
+# def valid_endpoint(endpoint):
+#     """This method checks for the valid endpoint"""
+#     try:
+#         if endpoint=='nobelPrizes' or endpoint =='laureates':
+#             return endpoint
+#         else:
+#             raise ValueError
+#     except ValueError:
+#         msg = f"Not a valid endpoint.It must be either nobelPrizes or laureates"
+#         raise argparse.ArgumentTypeError(msg)
 
 def main():
     """This is the main method for this module"""
@@ -185,14 +197,13 @@ def main():
         default=int(datetime.now().date().strftime("%Y")) - 1,
     )
     parser.add_argument("--toyear", help="Enter the end year YYYY", type=int)
+    parser.add_argument("--endpoint",choices=['nobelPrizes','laureates'],help="Enter the endpoint",required=True)
     args = parser.parse_args()
-    api_details = NobelPrizeLaureatesPartitionS3(logger_obj, args.fromyear, args.toyear)
-    # api_details.fetch_nobel_prize_details_from_api()
-    # api_details.fetch_laureate_details_from_api()
-    list_year = api_details.fetch_nobelprize_laureate_from_api_each_year(pull_for="nobelPrizes")
-    api_details.get_response_from_api(list_year[-1], list_year[:-1])
-    list_year = api_details.fetch_nobelprize_laureate_from_api_each_year(pull_for="laureates")
-    api_details.get_response_from_api(list_year[-1], list_year[:-1])
+    api_details = NobelPrizeLaureatesPartitionS3(logger_obj, args.fromyear, args.toyear,args.endpoint)
+    list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
+    api_details.get_response_from_api(list_year)
+    # list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
+    # api_details.get_response_from_api(list_year[-1], list_year[:-1])
 
 
 if __name__ == "__main__":
