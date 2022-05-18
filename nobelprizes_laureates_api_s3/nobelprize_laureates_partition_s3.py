@@ -5,14 +5,12 @@ import logging
 import configparser
 import os
 import argparse
-from datetime import datetime
+from datetime import date
 import sys
-from time import time
 import pandas as pd
 from nobelprizes_laureates_upload_local import NobelLaureateLocalUpload
 from pull_nobelprizes_laureates_from_api import NobelprizeLaureatesFromApi
-
-# from aws_s3.s3_details import S3Details
+from aws_s3.s3_details import S3Details
 
 parent_dir = os.path.dirname(os.getcwd())
 config = configparser.ConfigParser()
@@ -37,12 +35,11 @@ class NobelPrizeLaureatesPartitionS3:
             os.makedirs(self.local_path)
         self.local = NobelLaureateLocalUpload(logger_obj)
         self.api = NobelprizeLaureatesFromApi(logger_obj)
-        # self.s3_client = S3Details(logger_obj)
+        self.s3_client = S3Details(logger_obj)
 
     def fetch_nobelprize_laureate_from_api_each_year(self):
         """This method fetches the nobel prize and laureates details from the api
         for each year between the given years"""
-        # print(pull_for)
         years_list = []
         try:
             if self.endyear:
@@ -50,7 +47,6 @@ class NobelPrizeLaureatesPartitionS3:
                     years_list.append(get_year)
             else:
                 years_list.append(self.startyear)
-            # years_list.append(pull_for)
         except Exception as err:
             self.logger.error(f"Cannot get the resposnse from the given list of years{err}")
             print(err)
@@ -75,10 +71,6 @@ class NobelPrizeLaureatesPartitionS3:
                 else:
                     self.logger.info(f"No responses from api {response}")
                     df_data = None
-                    sys.exit(
-                        "System terminated for failed in getting nobelprize or laureate response from api"
-                    )
-
         except Exception as err:
             self.logger.error(f"Cannot able to get response from api{err}")
             df_data = None
@@ -168,11 +160,14 @@ def main():
         "--fromyear",
         help="Enter the start year YYYY",
         type=int,
-        default=int(datetime.now().date().strftime("%Y")) - 1,
+        default=int(date.today().strftime("%Y")) - 1,
     )
     parser.add_argument("--toyear", help="Enter the end year YYYY", type=int)
     parser.add_argument(
-        "--endpoint", choices=["nobelPrizes", "laureates"], help="Enter the endpoint", required=True
+        "--endpoint",
+        choices=["nobelPrizes", "laureates"],
+        help="Choose the endpoint",
+        required=True,
     )
     args = parser.parse_args()
     api_details = NobelPrizeLaureatesPartitionS3(
@@ -180,8 +175,6 @@ def main():
     )
     list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
     api_details.get_response_from_api(list_year)
-    # list_year = api_details.fetch_nobelprize_laureate_from_api_each_year()
-    # api_details.get_response_from_api(list_year[-1], list_year[:-1])
 
 
 if __name__ == "__main__":
