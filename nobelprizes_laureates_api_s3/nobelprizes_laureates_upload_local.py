@@ -14,16 +14,20 @@ class NobelLaureateLocalUpload:
     def __init__(self, logger):
         self.logger = logger
 
-    def upload_parition_s3_local(self, local_apipath, copy_source, file_name, partition_path):
+    def upload_parition_s3_local(self, local_path, copy_source, file_name, partition_path):
         """This method uploads weatherdata in the partition path in the form of json"""
         try:
-            new_dir = local_apipath + "/" + partition_path + "/"
+            new_dir = local_path + "/" + partition_path + "/"
             if not os.path.exists(new_dir):
                 os.makedirs(new_dir)
             shutil.copy(copy_source, new_dir)
             os.remove(copy_source)
-            print(f"Successfully created json file '{file_name}' in the given path '{partition_path}'\n")
-            self.logger.info(f"Successfully created json file {file_name} in the given path {partition_path}")
+            print(
+                f"Successfully created json file'{file_name}' in the given path'{partition_path}'\n"
+            )
+            self.logger.info(
+                f"Successfully created json file {file_name} in the given path {partition_path}"
+            )
 
         except Exception as err:
             print("Cannot upload the json file in the given path:", err)
