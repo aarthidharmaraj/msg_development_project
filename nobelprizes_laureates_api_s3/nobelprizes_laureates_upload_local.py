@@ -21,13 +21,12 @@ class NobelLaureateLocalUpload:
             if not os.path.exists(new_dir):
                 os.makedirs(new_dir)
             shutil.copy(copy_source, new_dir)
-            print(copy_source)
             os.remove(copy_source)
-            print("Successfully created json file in the given path\n")
-            self.logger.info("Successfully created json file in the given path")
+            print(f"Successfully created json file '{file_name}' in the given path '{partition_path}'\n")
+            self.logger.info(f"Successfully created json file {file_name} in the given path {partition_path}")
 
         except Exception as err:
             print("Cannot upload the json file in the given path:", err)
-            self.logger.error("Cannot upload the json file in the given path")
+            self.logger.error(f"Cannot upload the json file in the given path{err}")
             file_name = None
         return file_name
