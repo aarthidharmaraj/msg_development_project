@@ -1,5 +1,6 @@
 """Thi module tests for getting employee details from sql, and partition 
     them and upload to s3 and local"""
+from argparse import ArgumentError
 import os
 import logging
 import configparser
@@ -7,6 +8,8 @@ from datetime import datetime
 from time import time
 import pytest
 import pandas as pd
+import boto3
+from moto import mock_s3
 from employee_details_sql_partition_s3 import EmployeeDetailsPartitionS3, valid_date
 from employee_details_upload_local import EmployeeDetailsPartitionLocalUpload
 from get_employee_details_sql import EmployeeFromSql
@@ -44,10 +47,12 @@ def end_date():
     enddate = "2022-05-10"
     return datetime.strptime(enddate, "%Y-%m-%d").date()
 
+
 @pytest.fixture
 def date_none():
     """This method returns the date as none"""
     return None
+
 
 @pytest.fixture
 def file_name():
@@ -56,9 +61,22 @@ def file_name():
 
 
 @pytest.fixture
+def wrong_file_name():
+    """This method returns the wrong_file name in epoch format"""
+    return f"sample_{int(time())}.json"
+
+
+@pytest.fixture
 def partition():
     """This method returns the partition path"""
     partition_path = "pt_year=2022/pt_month=05/pt_day=06/"
+    return partition_path
+
+
+@pytest.fixture
+def wrong_partition():
+    """This method returns the wrong_partition path"""
+    partition_path = "year=2022/pt_month=05/pt_day=06/"
     return partition_path
 
 
@@ -98,6 +116,13 @@ def response():
 
 
 @pytest.fixture
+def false_response():
+    """This method returns the false_resposne"""
+    data = {"Name": ["emp1", "emp2"], "Joining_date": ["2022-05-08", "2022-05-09"]}
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
 def sql_server():
     """This method returns the server credentials to connect to server"""
     driver = "{ODBC Driver 17 for SQL Server}"
@@ -126,6 +151,7 @@ def column():
     """This method returns the colummn to fetch required datas"""
     return "Date_of_Joining"
 
+
 @pytest.fixture
 def false_table():
     """This method returns the table for fetching datas"""
@@ -137,12 +163,14 @@ def false_column():
     """This method returns the colummn to fetch required datas"""
     return "joining_date"
 
+
+@pytest.fixture
 def sql_server_fail():
     """This method returns the server credentials for fail connect to server"""
     driver = "{MySQL ODBC 8.0 Unicode Driver}"
-    host = "localhost"
+    host = " "
     user = "user"
-    password = "pass"
+    password = " "
     database = "Employee_payroll"
     client = {
         "driver": driver,
@@ -160,11 +188,57 @@ def query(table, column, condition, start_date, end_date):
     query = f"SELECT * from {table} where {column} {condition} '{start_date}'and '{end_date}'"
     return query
 
+
 @pytest.fixture
-def query_fail(false_table,false_column,condition,start_date,end_date):
+def query_fail(false_table, false_column, condition, start_date, end_date):
     """This method returns the false query to check"""
     query = f"SELECT * from {false_table} where {false_column} {condition} '{start_date}'and '{end_date}'"
     return query
+
+
+@pytest.fixture(scope="function")
+def aws_credentials():
+    """Mocked AWS Credentials for moto."""
+    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+    os.environ["AWS_SECURITY_TOKEN"] = "testing"
+    os.environ["AWS_SESSION_TOKEN"] = "testing"
+
+
+@pytest.fixture(scope="function")
+def s3_mock(aws_credentials):
+    with mock_s3():
+        yield boto3.client("s3", region_name="us-east-1")
+
+
+@pytest.fixture
+def file(file_name, sqlpath):
+    file = os.path.join(parent_dir, sqlpath, "sql_employee_details_test/", file_name)
+    return file
+
+
+@pytest.fixture
+def no_file():
+    return None
+
+
+@pytest.fixture
+def key(partition, file_name):
+    key_name = partition + file_name
+    return key_name
+
+
+@pytest.fixture
+def bucket_name():
+    bucket_name = config["s3"]["bucket_name"]
+    return bucket_name
+
+
+@pytest.fixture
+def bucket_path():
+    bucket_path = config["s3"]["bucket_path"]
+    return bucket_path
+
 
 class TestS3Details:
     """This Test Class will check for all the possible
@@ -175,17 +249,17 @@ class TestS3Details:
         self.obj = S3Details(logger_obj)
         assert isinstance(self.obj, S3Details)
 
-    def test_upload_s3_passed(self):
+    def test_upload_s3_passed(self, s3_mock, file, key):
         """This tests for put object in S3 class S3details"""
         self.s3_client = S3Details(logger_obj)
-        res = self.s3_client.upload_file("flow of code", "flow.txt")
-        assert res == "flow of code"
+        res = self.s3_client.upload_file(file, key)
+        assert res == file
 
     @pytest.mark.xfail
-    def test_upload_s3_failed(self):
+    def test_upload_s3_failed(self, no_file, key):
         """This method will test for the report is uploaded to S3 in class S3Operations"""
         self.s3_client = S3Details(logger_obj)
-        res = self.s3_client.upload_file(b"flow of code", "flow.txt")
+        res = self.s3_client.upload_file(no_file, key)
         assert res is None
 
 
@@ -198,28 +272,30 @@ class TestUploadPartitionLocal:
         self.obj_local = EmployeeDetailsPartitionLocalUpload(logger_obj)
         assert isinstance(self.obj_local, EmployeeDetailsPartitionLocalUpload)
 
-    def test_write_data_to_local_file_is_done(self, sqlpath, copy_source, file_name, partition):
+    def test_write_data_to_local_file_is_done(
+        self, sqlpath, copy_source, response, file_name, partition
+    ):
         """This method will test for the data is written to local file
         in class EmployeeDetailsPartitionLocalUpload"""
         self.obj_local = EmployeeDetailsPartitionLocalUpload(logger_obj)
-        new_df = pd.DataFrame()
-        new_df.to_json(sqlpath + "/" + file_name, orient="records", lines=True)
+        response.to_json(sqlpath + "/" + file_name, orient="records", lines=True)
         local_file = self.obj_local.upload_parition_s3_local(
             sqlpath, copy_source, file_name, partition
         )
         assert local_file == f"employee_{int(time())}.json"
 
     @pytest.mark.xfail
-    def test_write_data_to_local_file_is_not_done(self, file_name, partition):
+    def test_write_data_to_local_file_is_not_done(
+        self, sqlpath, copy_source, response, wrong_file_name, partition
+    ):
         """This method will test for the data is not written
         to local file in class  EmployeeDetailsPartitionLocalUpload"""
         self.obj_local = EmployeeDetailsPartitionLocalUpload(logger_obj)
-        new_df = pd.DataFrame()
-        new_df.to_json(sqlpath + "/" + file_name, orient="records", lines=True)
+        response.to_json(sqlpath + "/" + wrong_file_name, orient="records", lines=True)
         local_file = self.obj_local.upload_parition_s3_local(
-            sqlpath, copy_source, file_name, partition
+            sqlpath, copy_source, wrong_file_name, partition
         )
-        assert local_file == None
+        assert local_file is None
 
 
 class TestGetDetailsFromSql:
@@ -264,7 +340,7 @@ class TestGetDetailsFromSql:
         assert response is not None
 
     @pytest.mark.xfail
-    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server_fail,query):
+    def test_get_employee_details_by_joiningdate_is_notdone(self, sql_server_fail, query_fail):
         """This method tests for failure case to read from sql using pandas"""
         self.sql = EmployeeFromSql(logger_obj)
         client = sql_server_fail
@@ -274,7 +350,7 @@ class TestGetDetailsFromSql:
             client["database"],
             client["user"],
             client["password"],
-            query,
+            query_fail,
         )
         assert resposne is None
 
@@ -291,36 +367,36 @@ class TestGetDetailsFromSql:
 
     @pytest.mark.xfail
     def test_get_data_from_sql_failed_for_between(
-        self, start_date, condition, end_date, table, column
+        self, start_date, condition, date_none, false_table, false_column, query_fail
     ):
         """This method tests failure case for pulling employee details based
         on joining dates for between condition"""
-        self.obj_pullapi = EmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         get_query = self.sql.get_query_from_where_condition(
-            start_date, condition, end_date, table, column
+            start_date, condition, date_none, false_table, false_column
         )
         assert get_query is None
 
     def test_get_data_from_sql_passed_for_notbetween(
-        self, start_date, condition_not_between, table,date_none, column
+        self, start_date, condition_not_between, table, date_none, column
     ):
         """This method tests for pulling employee details based on
         joining dates for conditions other than between"""
         self.sql = EmployeeFromSql(logger_obj)
         get_query = self.sql.get_query_from_where_condition(
-            start_date, condition_not_between,date_none, table, column
+            start_date, condition_not_between, date_none, table, column
         )
         assert get_query is not None
 
     @pytest.mark.xfail
     def test_get_data_from_sql_failed_for_notbetween(
-        self, start_date, condition_not_between, table, column,enddate
+        self, start_date, condition_not_between, table, column, end_date
     ):
         """This method tests failure case for pulling employee details
         based on joining dates for conditions other than between"""
-        self.obj_pullapi = EmployeeFromSql(logger_obj)
+        self.sql = EmployeeFromSql(logger_obj)
         get_query = self.sql.get_query_from_where_condition(
-            start_date, condition_not_between,end_date, table, column
+            start_date, condition_not_between, end_date, table, column
         )
         assert get_query is None
 
@@ -331,8 +407,8 @@ class TestEmployeeDetailsPartition:
 
     def test_pull_metaweather_sql_objects(self, start_date, end_date, condition):
         """This tests for the instance belong to the class EmployeeDetailsPartitionS3"""
-        self.obj_sqlapi = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
-        assert isinstance(self.obj_sqlapi, EmployeeDetailsPartitionS3)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
+        assert isinstance(self.obj_sql, EmployeeDetailsPartitionS3)
 
     def test_filter_create_response_by_date_isdone(self, start_date, end_date, condition, response):
         """This method tests for filtering the response from sql based on dates"""
@@ -342,11 +418,11 @@ class TestEmployeeDetailsPartition:
 
     @pytest.mark.xfail
     def test_filter_create_response_by_date_is_notdone(
-        self, start_date, end_date, condition, response
+        self, start_date, end_date, condition, false_response
     ):
         """This method tests failure case for filtering the response from sql based on dates"""
         self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
-        result = self.obj_sql.filter_create_response_by_date(response, start_date)
+        result = self.obj_sql.filter_create_response_by_date(false_response, start_date)
         assert result == None
 
     def test_put_partition_path_isdone(self, start_date, end_date, condition):
@@ -356,11 +432,11 @@ class TestEmployeeDetailsPartition:
         assert response == "pt_year=2022/pt_month=05/pt_day=08"
 
     @pytest.mark.xfail
-    def test_put_partition_path_is_notdone(self, start_date, end_date, condition):
+    def test_put_partition_path_is_notdone(self, date_none, end_date, condition):
         """This method tests failure case for giving the partition path
         based on year,month,date"""
-        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, start_date, end_date, condition)
-        response = self.obj_sql.put_partition_path(start_date)
+        self.obj_sql = EmployeeDetailsPartitionS3(logger_obj, date_none, end_date, condition)
+        response = self.obj_sql.put_partition_path(date_none)
         assert response is None
 
     def test_valid_date_is_passed(self):
