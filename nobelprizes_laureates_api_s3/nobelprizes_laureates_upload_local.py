@@ -1,12 +1,6 @@
 """This module contains script for uploading data in json format in partiton path in local"""
 import os
-import configparser
 import shutil
-
-parent_dir = os.path.dirname(os.getcwd())
-config = configparser.ConfigParser()
-config.read(parent_dir + "/details.ini")
-
 
 class NobelLaureateLocalUpload:
     """This class has methods for local operations"""
