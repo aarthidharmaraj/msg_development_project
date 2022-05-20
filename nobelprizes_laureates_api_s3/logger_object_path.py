@@ -1,4 +1,4 @@
-"""This module has operations on logger and local path"""
+"""This module has operations on creating rotatimg time logger and access config files"""
 import os
 import configparser
 import logging
