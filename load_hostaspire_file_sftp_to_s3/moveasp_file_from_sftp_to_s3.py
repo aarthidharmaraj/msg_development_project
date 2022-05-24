@@ -6,8 +6,9 @@ partition based on date and upload to s3"""
 import os
 import shutil
 from zipfile import ZipFile
-# from aws_s3.s3_details import S3Details
-# from sftp.sftp_connection import SftpConnection
+import sys
+from aws_s3.s3_details import S3Details
+from sftp.sftp_connection import SftpConnection
 from logger_object_path import LoggerPath
 from sftp_to_s3_upload_local import MoveSftpToS3Local
 
@@ -22,8 +23,8 @@ class MoveAspSftpToS3:
         """This is the init method for the class"""
         self.logger = datas["logger"]
         self.sftp_local = MoveSftpToS3Local(self.logger, datas["config"])
-        # self.sftp_conn = SftpConnection(self.logger, datas["config"])
-        # self.s3_client = S3Details(self.logger)
+        self.sftp_conn = SftpConnection(self.logger, datas["config"])
+        self.s3_client = S3Details(self.logger, datas["config"])
         self.local_path = os.path.join(
             datas["parent_dir"], datas["config"]["local"]["data_path"], "sftp_to_s3_data"
         )
@@ -36,14 +37,23 @@ class MoveAspSftpToS3:
     def get_zip_file_from_sftp(self):
         """This method get the list of files from sftp server"""
         try:
-            # sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
-            sftp_file_list = self.sftp_local.get_latest_files_from_local()
-            for file_name in sftp_file_list:
-                print(file_name)
-                zip_source = self.sftp_path + file_name
-                self.logger.info("Got the file %s from sftp", file_name)
-                self.upload_zip_file_to_source_path(zip_source, file_name)
-                # self.get_file_from_sftp_upload_s3(file_name, zip_source)
+            sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
+            # sftp_file_list = self.sftp_local.get_latest_files_from_local(
+            #     self.local_path, self.s3path_source,self.sftp_path
+            # )
+            print(sftp_file_list)
+            if sftp_file_list:
+                for file_name in sftp_file_list:
+                    print(file_name)
+                    zip_source = self.sftp_path + file_name
+                    self.logger.info("Got the file %s from sftp", file_name)
+                    # self.upload_zip_file_to_source_path(zip_source, file_name)
+                    # self.upload_text_file_to_stage_path(zip_source, file_name)
+                    self.get_file_from_sftp_upload_s3(file_name, zip_source)
+            else:
+                sftp_file_list=None
+                self.logger.info("System terminated as there are no newly uploaded files in sftp")
+                sys.exit("System terminated as there are no newly uploaded files in sftp")
         except Exception as err:
             self.logger.error("Cannot get the file from the sftp path %s", err)
             print("Cannot get the file from given sftp path", err)
@@ -66,8 +76,6 @@ class MoveAspSftpToS3:
                 file_name,
                 partition_path,
             )
-            # file=self.upload_file_to_s3(temp_zip_source,partition_path,file_name)
-            self.upload_text_file_to_stage_path(zip_source, file_name)
         except Exception as err:
             self.logger.error("Cannot upload the zip file %s to the source path %s", file_name, err)
             file = None
@@ -87,7 +95,6 @@ class MoveAspSftpToS3:
             self.logger.info(
                 "Uploading the extrcated text file %s to stage path", file_name[0:12] + ".txt"
             )
-            # # file=self.upload_file_to_s3(temp_text_source,partition_path,file_name[0:12]+".txt")
         except Exception as err:
             file = None
             self.logger.error("Cannot upload the text file %s to the given stage path", err)
@@ -124,11 +131,11 @@ class MoveAspSftpToS3:
         """This method get the list of files from s3 and compare with
         sftp files for newly uploaded"""
         try:
-            uploaded_file_list = self.s3_client.get_list_of_files_in_s3(prefix="source/")
+            uploaded_file_list = self.s3_client.get_list_of_files_in_s3(self.s3path_source)
             self.logger.info("Got the list of files from s3 %s", uploaded_file_list)
-            sftp_file_list = self.sftp_conn.list_files()
+            sftp_file_list = self.sftp_conn.list_files(self.sftp_path)
             self.logger.info("Got the list of files from sftp %s", sftp_file_list)
-            new_file_list = [files for files in sftp_file_list if files not in uploaded_file_list]
+            new_file_list = list(set(sftp_file_list).symmetric_difference(set(uploaded_file_list)))
             self.logger.info(
                 "Created file_list %s containing newly uploaded files from sftp compared with s3",
                 new_file_list,
@@ -148,16 +155,14 @@ class MoveAspSftpToS3:
                     "The file %s has been fetched from sftp and passed upload method in s3",
                     file_name,
                 )
-                self.upload_file_to_s3(
-                    zip_source, self.s3path_source + "/" + partition_path, file_name
-                )
+                self.upload_file_to_s3(zip_source, self.s3path_source, partition_path, file_name)
                 self.logger.info(
                     "Uploading the zip file %s from sftp server to s3 in the given source path",
                     file_name,
                 )
             text_source = self.extract_the_files_from_zip(zip_source, file_name)
             file = self.upload_file_to_s3(
-                text_source, self.s3path_stage + "/" + partition_path, file_name[0:12] + ".txt"
+                text_source, self.s3path_stage, partition_path, file_name[0:12] + ".txt"
             )
             self.logger.info("Uploading the extracted text file %s to s3", file_name[0:12] + ".txt")
         except IOError as ier:
@@ -166,7 +171,7 @@ class MoveAspSftpToS3:
             file = None
         return file
 
-    def upload_file_to_s3(self, source, partition_path, file_name):
+    def upload_file_to_s3(self, source, bucket_path, partition_path, file_name):
         """This method used to upload the file to s3 in the partiton created"""
         try:
             key = partition_path + "/" + file_name
@@ -174,7 +179,7 @@ class MoveAspSftpToS3:
                 "The file %s being uploaded to s3 in the given path %s", file_name, key
             )
             print("the file has been uploaded to s3 in the given path")
-            file = self.s3_client.upload_file(source, key)
+            file = self.s3_client.upload_file(source, bucket_path, key)
             os.remove(source)
         except Exception as err:
             self.logger.error("Cannot upload the files to s3 in the given path %s", err)
