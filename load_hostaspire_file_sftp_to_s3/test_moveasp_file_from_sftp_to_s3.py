@@ -14,6 +14,13 @@ from aws_s3.s3_details import S3Details
 from sftp.sftp_connection import SftpConnection
 from moveasp_file_from_sftp_to_s3 import MoveAspSftpToS3
 from sftp_to_s3_upload_local import MoveSftpToS3Local
+from contextlib import closing
+import py.path
+
+
+@pytest.fixture
+def root_path(sftp_server):
+    return py.path.local(sftp_server.root)
 
 
 @pytest.fixture
@@ -118,6 +125,12 @@ def upload_path(parent_dir, config_path):
     return local_path
 
 
+@pytest.fixture
+def duplicate_path():
+    """This method returns the duplicate path for list files from sftp local"""
+    return "abc/xyz/path"
+
+
 @pytest.fixture(scope="function")
 def aws_credentials():
     """Mocked AWS Credentials for moto."""
@@ -125,10 +138,12 @@ def aws_credentials():
     os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
     os.environ["AWS_SECURITY_TOKEN"] = "testing"
     os.environ["AWS_SESSION_TOKEN"] = "testing"
+    os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
 
 @pytest.fixture(scope="function")
 def s3_mock(aws_credentials):
+    """This method creates a mock for s3 services"""
     with mock_s3():
         yield boto3.client("s3", region_name="us-east-1")
 
@@ -158,15 +173,8 @@ def bucket_name(config_path):
 
 @pytest.fixture
 def bucket_path(config_path):
-    bucket_path = config_path["s3"]["bucket_path"]
+    bucket_path = config_path["move_asp_from_sftp_to_s3"]["s3_path_source"]
     return bucket_path
-
-
-@pytest.fixture
-def copy_source(upload_path, file_name):
-    """This method returns the copy source to upload in local"""
-    source = upload_path + "/" + file_name
-    return source
 
 
 @pytest.fixture
@@ -199,11 +207,38 @@ class TestUploadPartitionLocal:
         self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
         assert isinstance(self.obj_local, MoveSftpToS3Local)
 
-    def test_get_latest_file_is_done(self, logger_obj, config_path):
+    def test_get_latest_file_is_done(
+        self, logger_obj, config_path, upload_path, source_path, sftp_path
+    ):
         """This method tests for gettiing the latest file from sftp local"""
         self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
-        list_file = self.obj_local.get_latest_files_from_local()
+        latest_file = self.obj_local.get_latest_files_from_local(
+            upload_path, source_path, sftp_path
+        )
+        assert isinstance(latest_file, list)
+
+    @pytest.mark.xfail
+    def test_get_latest_file_is_notdone(
+        self, logger_obj, config_path, upload_path, source_none, sftp_path
+    ):
+        """This method tests for gettiing the latest file from sftp local"""
+        self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
+        latest_file = self.obj_local.get_latest_files_from_local(
+            upload_path, source_none, sftp_path
+        )
+        assert latest_file is None
+
+    def test_get_list_of_files_is_done(self, logger_obj, config_path, sftp_path):
+        """This method gets the list of files from the local path is done"""
+        self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
+        list_file = self.obj_local.list_files_sftp_local(sftp_path)
         assert isinstance(list_file, list)
+
+    def test_get_list_of_files_is_notdone(self, logger_obj, config_path, duplicate_path):
+        """This method gets the list of files from the local path is not done"""
+        self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
+        list_file = self.obj_local.list_files_sftp_local(duplicate_path)
+        assert list_file is None
 
     def test_upload_zip_to_local_file_is_done(
         self, logger_obj, upload_path, config_path, zip_source, file_name, partition_path
@@ -222,7 +257,7 @@ class TestUploadPartitionLocal:
         logger_obj,
         upload_path,
         config_path,
-        zip_source_none,
+        source_none,
         file_name,
         partition_path,
     ):
@@ -274,23 +309,55 @@ class TestS3Details:
     """This Test Class will check for all the possible
     Test cases in S3Operations"""
 
-    def test_s3operations_objects(self, logger_obj):
+    def test_s3operations_objects(self, logger_obj, config_path):
         """This Method will test for the instance belong to the class S3Operations"""
-        self.obj = S3Details(logger_obj)
+        self.obj = S3Details(logger_obj, config_path)
         assert isinstance(self.obj, S3Details)
 
-    def test_upload_s3_passed(self, s3_mock, logger_obj, file, key):
+    def test_upload_s3_passed(self, s3_mock, bucket_path, config_path, logger_obj, file, key):
         """This tests for put object in S3 class S3details"""
-        self.s3_client = S3Details(logger_obj)
-        res = self.s3_client.upload_file(file, key)
+        self.s3_client = S3Details(logger_obj, config_path)
+        res = self.s3_client.upload_file(file, bucket_path, key)
         assert res == file
 
     @pytest.mark.xfail
-    def test_upload_s3_failed(self, logger_obj, no_file, key):
+    def test_upload_s3_failed(self, logger_obj, bucket_path, config_path, no_file, key):
         """This method will test for the report is uploaded to S3 in class S3Operations"""
-        self.s3_client = S3Details(logger_obj)
-        res = self.s3_client.upload_file(no_file, key)
+        self.s3_client = S3Details(logger_obj, config_path)
+        res = self.s3_client.upload_file(no_file, bucket_path, key)
         assert res is None
+
+
+def test_s3_operations_passed(s3_mock, bucket_name, file, key):
+    """This method tests the s3 operations"""
+    try:
+        S3 = boto3.client("s3", region_name="us-east-1")
+        S3.create_bucket(Bucket=bucket_name)
+        result = S3.list_buckets()
+        S3.put_object(Bucket=bucket_name, Body=file, Key=key)
+        obj = S3.list_objects_v2(Bucket=bucket_name)
+    except Exception:
+        result = None
+        obj = None
+    assert len(result["Buckets"]) == 1
+    assert result["Buckets"][0]["Name"] == "msg_practice_induction"
+    assert obj["Contents"][0]["Key"] == key
+
+
+@pytest.mark.xfail
+def test_s3_operations_failed(s3_mock, bucket_name, no_file, key):
+    """This method tests the s3 operations are not done"""
+    try:
+        S3 = boto3.client("s3", region_name="us-east-1")
+        S3.create_bucket(Bucket=bucket_name)
+        result = S3.list_buckets()
+        S3.put_object(Bucket=bucket_name, Body=no_file, Key=key)
+        obj = S3.list_objects_v2(Bucket=bucket_name)
+    except Exception as err:
+        result = None
+        obj = None
+    assert result is None
+    assert obj is None
 
 
 class TestLoadSftpToS3:
@@ -308,9 +375,7 @@ class TestLoadSftpToS3:
         assert path == partition_path
 
     @pytest.mark.xfail
-    def test_put_partition_path_for_nobelprize_is_notdone(
-        self, wrong_file_name, wrong_partition_path
-    ):
+    def test_put_partition_path_is_notdone(self, wrong_file_name, wrong_partition_path):
         """This method tests failure case for giving the partition path
         based on year,month and date"""
         self.obj = MoveAspSftpToS3()
@@ -330,31 +395,54 @@ class TestLoadSftpToS3:
         text_source = self.obj.extract_the_files_from_zip(source_none, file_name)
         assert text_source is None
 
+    def test_get_zip_file_is_done(self):
+        """This method tests for getting zip file from sftp local is done"""
+        self.obj = MoveAspSftpToS3()
+        zip_source = self.obj.get_zip_file_from_sftp()
+        assert zip_source is not None
 
-# class TestSftpConnection:
-#     """This class has methods to test all possible testcases in sftp module"""
-#     def test_sftp_object(self,logger_obj,config_path):
-#         """This method tests the instances of sftp connection"""
-#         self.sftp=SftpConnection(logger_obj,config_path)
-#         assert isinstance(self.sftp,SftpConnection)
 
-#     def test_sftp_connection(self):
-#         """This method tests for the patch mock connection of sftp"""
-#         with patch("pysftp.Connection") as mock_connection:
-#             with pysftp.Connection("1.2.3.4", "user", "pwd", 12345) as sftp:
-#                 sftp.get("filename")
-# mock_connection.assert_called_with("1.2.3.4", "user", "pwd", 12345)
-# sftp.get.assert_called_with("filename")
+class TestSftpConnection:
+    """This class has methods to test all possible testcases in sftp module"""
 
-# def test_list_files_passed(self,logger_obj,config_path):
-#     """This tests for files returning from list_files method in sftp_to_s3"""
-#     self.sftp = SftpConnection(logger_obj,config_path)
-#     file_list = self.sftp.list_files()
-#     assert isinstance(file_list,list)
+    def test_sftp_object(self, logger_obj, config_path):
+        """This method tests the instances of sftp connection"""
+        self.sftp = SftpConnection(logger_obj, config_path)
+        assert isinstance(self.sftp, SftpConnection)
 
-# @pytest.mark.xfail
-# def test_list_files_failed(self,logger_obj,config_path):
-#     """This tests for files not returning from list_files method in sftp_to_s3"""
-#     self.sftp = SftpConnection(logger_obj,config_path)
-#     result = self.sftp.list_files()
-#     assert isinstance(result,dict)
+    def test_sftp_connection(self):
+        """This method tests for the patch mock connection of sftp"""
+        with patch("pysftp.Connection") as mock_connection:
+            with pysftp.Connection("1.2.3.4", "user", "pwd", 12345) as sftp:
+                sftp.get("filename")
+            mock_connection.assert_called_with("1.2.3.4", "user", "pwd", 12345)
+            sftp.get.assert_called_with("filename")
+
+
+def test_sftp_list_files_passed(root_path, sftp_client):
+    """This method tests for listing of files from sftp failed"""
+    try:
+        sftp = sftp_client.open_sftp()
+        assert sftp.listdir(".") == []
+        root_path.join("sample_file.zip").write("sample zip file")
+        root_path.join("subdir/file2.zip").write("sample zip file with directory", ensure=True)
+        with closing(sftp.open("sample_file.zip", "r")) as data:
+            assert data.read() == b"sample zip file"
+    except Exception:
+        sftp = None
+    assert (sftp.listdir(".")) == ["sample_file.zip", "subdir"]
+    assert sftp.listdir("subdir") == ["file2.zip"]
+
+
+@pytest.mark.xfail
+def test_sftp_list_files_failed(duplicate_path, sftp_client):
+    """This method tests for listing of files from sftp failed"""
+    try:
+        sftp = sftp_client.open_sftp()
+        duplicate_path.join("sample_file.zip").write("sample zip file")
+        duplicate_path.join("subdir/file2.zip").write("sample zip file with directory", ensure=True)
+        with closing(sftp.open("sample_file.zip", "r")) as data:
+            assert data.read() == b"sample zip file"
+    except Exception:
+        sftp = None
+    assert sftp is None
