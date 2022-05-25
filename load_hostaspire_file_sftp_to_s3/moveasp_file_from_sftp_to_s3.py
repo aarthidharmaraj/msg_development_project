@@ -38,10 +38,10 @@ class MoveAspSftpToS3:
     def get_zip_file_from_sftp(self):
         """This method get the list of files from sftp server"""
         try:
-            # sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
-            sftp_file_list = self.sftp_local.get_latest_files_from_local(
-                self.local_path, self.s3path_source,self.sftp_path
-            )
+            sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
+            # sftp_file_list = self.sftp_local.get_latest_files_from_local(
+            #     self.local_path, self.s3path_source,self.sftp_path
+            # )
             print(sftp_file_list)
             if sftp_file_list:
                 for file_name in sftp_file_list:
@@ -50,11 +50,11 @@ class MoveAspSftpToS3:
                     self.logger.info("Got the file %s from sftp", file_name)
                     # self.upload_zip_file_to_source_path(zip_source, file_name)
                     # self.upload_text_file_to_stage_path(zip_source, file_name)
-                    # self.get_file_from_sftp_upload_s3(file_name, zip_source)
+                    self.get_file_from_sftp_upload_s3(file_name, zip_source)
             else:
                 zip_source=None
                 self.logger.info("System terminated as there are no newly uploaded files in sftp")
-                # sys.exit("System terminated as there are no newly uploaded files in sftp")
+                sys.exit("System terminated as there are no newly uploaded files in sftp")
         except Exception as err:
             self.logger.error("Cannot get the file from the sftp path %s", err)
             print("Cannot get the file from given sftp path", err)
