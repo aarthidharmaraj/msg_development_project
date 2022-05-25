@@ -7,8 +7,8 @@ import os
 import shutil
 from zipfile import ZipFile
 import sys
-from aws_s3.s3_details import S3Details
-from sftp.sftp_connection import SftpConnection
+# from aws_s3.s3_details import S3Details
+# from sftp.sftp_connection import SftpConnection
 from logger_object_path import LoggerPath
 from sftp_to_s3_upload_local import MoveSftpToS3Local
 
@@ -23,8 +23,8 @@ class MoveAspSftpToS3:
         """This is the init method for the class"""
         self.logger = datas["logger"]
         self.sftp_local = MoveSftpToS3Local(self.logger, datas["config"])
-        self.sftp_conn = SftpConnection(self.logger, datas["config"])
-        self.s3_client = S3Details(self.logger, datas["config"])
+        # self.sftp_conn = SftpConnection(self.logger, datas["config"])
+        # self.s3_client = S3Details(self.logger, datas["config"])
         self.local_path = os.path.join(
             datas["parent_dir"], datas["config"]["local"]["data_path"], "sftp_to_s3_data"
         )
@@ -33,14 +33,15 @@ class MoveAspSftpToS3:
         self.sftp_path = datas["config"]["move_asp_from_sftp_to_s3"]["sftp_path"]
         self.s3path_source = datas["config"]["move_asp_from_sftp_to_s3"]["s3_path_source"]
         self.s3path_stage = datas["config"]["move_asp_from_sftp_to_s3"]["s3_path_stage"]
-
+        self.bucket=datas["config"]["move_asp_from_sftp_to_s3"]['bucket']
+        
     def get_zip_file_from_sftp(self):
         """This method get the list of files from sftp server"""
         try:
-            sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
-            # sftp_file_list = self.sftp_local.get_latest_files_from_local(
-            #     self.local_path, self.s3path_source,self.sftp_path
-            # )
+            # sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
+            sftp_file_list = self.sftp_local.get_latest_files_from_local(
+                self.local_path, self.s3path_source,self.sftp_path
+            )
             print(sftp_file_list)
             if sftp_file_list:
                 for file_name in sftp_file_list:
@@ -49,11 +50,11 @@ class MoveAspSftpToS3:
                     self.logger.info("Got the file %s from sftp", file_name)
                     # self.upload_zip_file_to_source_path(zip_source, file_name)
                     # self.upload_text_file_to_stage_path(zip_source, file_name)
-                    self.get_file_from_sftp_upload_s3(file_name, zip_source)
+                    # self.get_file_from_sftp_upload_s3(file_name, zip_source)
             else:
-                sftp_file_list=None
+                zip_source=None
                 self.logger.info("System terminated as there are no newly uploaded files in sftp")
-                sys.exit("System terminated as there are no newly uploaded files in sftp")
+                # sys.exit("System terminated as there are no newly uploaded files in sftp")
         except Exception as err:
             self.logger.error("Cannot get the file from the sftp path %s", err)
             print("Cannot get the file from given sftp path", err)
@@ -179,7 +180,7 @@ class MoveAspSftpToS3:
                 "The file %s being uploaded to s3 in the given path %s", file_name, key
             )
             print("the file has been uploaded to s3 in the given path")
-            file = self.s3_client.upload_file(source, bucket_path, key)
+            file = self.s3_client.upload_file(source,self.bucket, bucket_path, key)
             os.remove(source)
         except Exception as err:
             self.logger.error("Cannot upload the files to s3 in the given path %s", err)
