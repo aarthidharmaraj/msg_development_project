@@ -176,6 +176,24 @@ def bucket_path(config_path):
     bucket_path = config_path["move_asp_from_sftp_to_s3"]["s3_path_source"]
     return bucket_path
 
+@pytest.fixture
+def s3_mock_client():
+    """This is the fixture for mocking s3 service"""
+    with mock_s3():
+        conn = boto3.client("s3", region_name="us-east-1")
+        yield conn
+        
+@pytest.fixture
+def s3_bucket(s3_mock_client, bucket_name):
+        """This is the fixture for creating s3 bucket"""
+        res = s3_mock_client.create_bucket(Bucket=bucket_name)
+        yield res
+
+@pytest.fixture
+def s3_upload(s3_mock_client,bucket_name,s3_bucket,file,bucket_path):
+    """This fixture is to upload file in s3 mock bucket"""
+    upload=s3_mock_client.put_object(Bucket=bucket_name, Body=file, Key=bucket_path)
+    yield 
 
 @pytest.fixture
 def source_path():
@@ -303,61 +321,40 @@ class TestUploadPartitionLocal:
             upload_path, source_none, text_file_name, partition_path
         )
         assert local_file is None
-
-
-class TestS3Details:
-    """This Test Class will check for all the possible
-    Test cases in S3Operations"""
-
-    def test_s3operations_objects(self, logger_obj, config_path):
-        """This Method will test for the instance belong to the class S3Operations"""
-        self.obj = S3Details(logger_obj, config_path)
-        assert isinstance(self.obj, S3Details)
-
-    def test_upload_s3_passed(self, s3_mock, bucket_path, config_path, logger_obj, file, key):
-        """This tests for put object in S3 class S3details"""
-        self.s3_client = S3Details(logger_obj, config_path)
-        res = self.s3_client.upload_file(file, bucket_path, key)
-        assert res == file
-
+        
+class Test_s3:
+    """This class will test all possible testcases in s3 module"""
+    
+    def test_s3_object(self,logger_obj,config_path):
+        """This method test the instance belong to the class of S3Service"""
+        self.s3_obj = S3Details(logger_obj,config_path)
+        assert isinstance(self.s3_obj, S3Details)
+        
+    def test_upload_file_s3_done(self,file,config_path,key,bucket_name,s3_mock_client,s3_bucket,bucket_path,logger_obj):
+        """This method will test file is sucessfully uploaded"""
+        self.my_client = S3Details(logger_obj,config_path)
+        response = self.my_client.upload_file(file,bucket_name,bucket_path,key)
+        assert response is not None
+        
     @pytest.mark.xfail
-    def test_upload_s3_failed(self, logger_obj, bucket_path, config_path, no_file, key):
-        """This method will test for the report is uploaded to S3 in class S3Operations"""
-        self.s3_client = S3Details(logger_obj, config_path)
-        res = self.s3_client.upload_file(no_file, bucket_path, key)
-        assert res is None
-
-
-def test_s3_operations_passed(s3_mock, bucket_name, file, key):
-    """This method tests the s3 operations"""
-    try:
-        S3 = boto3.client("s3", region_name="us-east-1")
-        S3.create_bucket(Bucket=bucket_name)
-        result = S3.list_buckets()
-        S3.put_object(Bucket=bucket_name, Body=file, Key=key)
-        obj = S3.list_objects_v2(Bucket=bucket_name)
-    except Exception:
-        result = None
-        obj = None
-    assert len(result["Buckets"]) == 1
-    assert result["Buckets"][0]["Name"] == "msg_practice_induction"
-    assert obj["Contents"][0]["Key"] == key
-
-
-@pytest.mark.xfail
-def test_s3_operations_failed(s3_mock, bucket_name, no_file, key):
-    """This method tests the s3 operations are not done"""
-    try:
-        S3 = boto3.client("s3", region_name="us-east-1")
-        S3.create_bucket(Bucket=bucket_name)
-        result = S3.list_buckets()
-        S3.put_object(Bucket=bucket_name, Body=no_file, Key=key)
-        obj = S3.list_objects_v2(Bucket=bucket_name)
-    except Exception as err:
-        result = None
-        obj = None
-    assert result is None
-    assert obj is None
+    def test_upload_file_S3_notdone(self,config_path,key,no_file,bucket_name,s3_mock_client,s3_bucket,bucket_path,logger_obj):
+        """This method will test file is not uploaded"""
+        self.my_client = S3Details(logger_obj,config_path)
+        response = self.my_client.upload_file(no_file,bucket_name,bucket_path,key)
+        assert response is None
+    
+    def test_get_list_of_files_s3_done(self,config_path,bucket_name,s3_mock_client,s3_bucket,s3_upload,bucket_path,logger_obj):
+        """this method tests for getting the list of files from s3 is done"""
+        self.my_client = S3Details(logger_obj,config_path)
+        response=self.my_client.get_list_of_files_in_s3(bucket_name,bucket_path)
+        assert isinstance(response,list)
+        
+    @pytest.mark.xfail
+    def test_get_list_of_files_s3_notdone(self,config_path,key,s3_mock_client,s3_bucket,s3_upload,bucket_path,logger_obj):
+        """this method tests for getting the list of files from s3 is not done"""
+        self.my_client = S3Details(logger_obj,config_path)
+        response=self.my_client.get_list_of_files_in_s3("None",bucket_path+key)
+        assert response is None
 
 
 class TestLoadSftpToS3:
