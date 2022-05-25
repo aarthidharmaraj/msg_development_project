@@ -8,7 +8,6 @@ class MoveSftpToS3Local:
 
     def __init__(self, logger, config):
         self.logger = logger
-        # self.sftp_path = config["move_asp_from_sftp_to_s3"]["sftp_path"]
 
     def list_files_sftp_local(self,sftp_path):
         """This method gets the list of files names for the given local sftp path by filtering"""
