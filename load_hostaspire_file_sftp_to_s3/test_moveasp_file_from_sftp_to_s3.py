@@ -89,11 +89,15 @@ def file_name():
     """This method returns the file name"""
     return "ASP_20220523.zip"
 
+@pytest.fixture
+def base_file(file_name):
+    """This method returns the base file from file_name"""
+    return file_name.split(".")[0]
 
 @pytest.fixture
-def wrong_file_name():
+def wrong_base_file():
     """This method returns the wrong file name"""
-    return "asp_202202.zip"
+    return "ASPIRE_202210230"
 
 
 @pytest.fixture
@@ -252,6 +256,7 @@ class TestUploadPartitionLocal:
         list_file = self.obj_local.list_files_sftp_local(sftp_path)
         assert isinstance(list_file, list)
 
+    @pytest.mark.xfail
     def test_get_list_of_files_is_notdone(self, logger_obj, config_path, duplicate_path):
         """This method gets the list of files from the local path is not done"""
         self.obj_local = MoveSftpToS3Local(logger_obj, config_path)
@@ -305,7 +310,7 @@ class TestUploadPartitionLocal:
         assert local_file == text_file_name
 
     @pytest.mark.xfail
-    def test_upload_text_to_local_file_is_done(
+    def test_upload_text_to_local_file_is_notdone(
         self,
         logger_obj,
         upload_path,
@@ -365,19 +370,19 @@ class TestLoadSftpToS3:
         self.obj = MoveAspSftpToS3()
         assert isinstance(self.obj, MoveAspSftpToS3)
 
-    def test_put_partition_path_isdone(self, partition_path, file_name):
+    def test_put_partition_path_isdone(self, partition_path, base_file):
         """This method tests for giving the partition path for based on year,month and date"""
         self.obj = MoveAspSftpToS3()
-        path = self.obj.put_partition_path(file_name)
+        path = self.obj.put_partition_path(base_file)
         assert path == partition_path
 
     @pytest.mark.xfail
-    def test_put_partition_path_is_notdone(self, wrong_file_name, wrong_partition_path):
+    def test_put_partition_path_is_notdone(self, wrong_base_file, wrong_partition_path):
         """This method tests failure case for giving the partition path
         based on year,month and date"""
         self.obj = MoveAspSftpToS3()
-        response = self.obj.put_partition_path(wrong_file_name)
-        assert response == wrong_partition_path
+        response = self.obj.put_partition_path(wrong_base_file)
+        assert response is None
 
     def test_extract_file_is_done(self, zip_source, file_name):
         """this method tests for the extraction of text file from zip is done"""
