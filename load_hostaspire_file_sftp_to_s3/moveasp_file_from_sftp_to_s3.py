@@ -39,34 +39,18 @@ class MoveAspSftpToS3:
                 self.local_path, self.s3path_source, self.sftp_path
             )
             # sftp_file_list = self.get_list_of_file_notin_s3_from_sftp()
-            #if there is presence of new files in sftp iterate through each files
+            #if there is presence of new files in sftp iterate through each files if it is zip
             if sftp_file_list:
                 for file_name in sftp_file_list:
-                    print(file_name)
-                    zip_source = self.sftp_path + file_name
-                    self.logger.info("Got the file %s from sftp", file_name)
-                    temp_zip_source = self.local_path + "/" + file_name
-                    shutil.copy(zip_source, self.local_path + "/")
-                    base_file = file_name.split(".")[0]
-                    partition_path = self.put_partition_path(base_file)
-                    self.sftp_s3_local.upload_zip_text_file_to_given_path(
-                        self.local_path,
-                        partition_path,
-                        temp_zip_source,
-                        file_name,
-                        self.s3path_source,
-                    )
-                    self.logger.info("Successfully uploaded Zip files to the source path")
-                    temp_text_source = self.extract_the_files_from_zip(zip_source, base_file)
-                    self.sftp_s3_local.upload_zip_text_file_to_given_path(
-                        self.local_path,
-                        partition_path,
-                        temp_text_source,
-                        base_file + ".txt",
-                        self.s3path_stage,
-                    )
-                    self.logger.info("Successfully uploaded text files to the stage path")
-                    # self.fetch_file_from_sftp_upload_s3(file_name, zip_source,partition_path)
+                    if file_name.endswith('.zip'):
+                        print(file_name)
+                        zip_source = self.sftp_path + file_name
+                        self.logger.info("Got the file %s from sftp", file_name)
+                        self.get_partition_and_upload_files(file_name,zip_source)
+                    else:
+                        self.logger.info("The file format %s is not suported to the requirement",file_name)
+                        print("The file format is not suported to the requirement",file_name)
+                        zip_source=None
             else:
                 zip_source = None
                 self.logger.info("System terminated as there are no newly uploaded files in sftp")
@@ -76,6 +60,38 @@ class MoveAspSftpToS3:
             print("Cannot get the file from given sftp path", err)
             zip_source = None
         return zip_source
+    
+    def get_partition_and_upload_files(self,file_name,zip_source):
+        """This method gets the partition path and upload the zip file to 
+        source path and extract text file and upload to stage path."""
+        try:
+            temp_zip_source = self.local_path + "/" + file_name
+            shutil.copy(zip_source, self.local_path + "/")
+            base_file = file_name.split(".")[0]
+            partition_path = self.put_partition_path(base_file)
+            self.sftp_s3_local.upload_zip_text_file_to_given_path(
+                                self.local_path,
+                                partition_path,
+                                temp_zip_source,
+                                file_name,
+                                self.s3path_source,
+                            )
+            self.logger.info("Successfully uploaded Zip files to the source path")
+            temp_text_source = self.extract_the_files_from_zip(zip_source, base_file)
+            file=self.sftp_s3_local.upload_zip_text_file_to_given_path(
+                                self.local_path,
+                                partition_path,
+                                temp_text_source,
+                                base_file + ".txt",
+                                self.s3path_stage,
+                        )
+            self.logger.info("Successfully uploaded text files to the stage path")
+            # file=self.fetch_file_from_sftp_upload_s3(file_name, temp_zip_source,partition_path)
+        except Exception as err:
+            self.logger.error("The file cannot be uploaded to the given path %s ",err)
+            file=None
+        return file
+            
 
     def extract_the_files_from_zip(self, zip_source, base_file):
         """This method extracts the file from zip folder"""
@@ -132,14 +148,14 @@ class MoveAspSftpToS3:
                 )
                 self.upload_file_to_s3(zip_source, self.s3path_source, partition_path, file_name)
                 self.logger.info(
-                    "Uploading the zip file %s from sftp server to s3 in the given source path",
+                    "Uploaded the zip file %s from sftp server to s3 in the given source path",
                     file_name,
                 )
             text_source = self.extract_the_files_from_zip(zip_source, file_name)
             file = self.upload_file_to_s3(
                 text_source, self.s3path_stage, partition_path, base_file + ".txt"
             )
-            self.logger.info("Uploading the extracted text file %s to s3", base_file + ".txt")
+            self.logger.info("Uploaded the extracted text file %s to s3", base_file + ".txt")
         except IOError as ier:
             print("The file cannot be opened or uploaded to s3 from sftp", ier)
             self.logger.error("The file cannot be opened or uploaded to s3 from sftp %s", ier)
