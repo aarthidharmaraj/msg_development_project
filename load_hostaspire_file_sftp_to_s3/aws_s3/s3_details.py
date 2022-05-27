@@ -7,29 +7,29 @@ class S3Details:
 
     def __init__(self, logger, config):
         """This is the init method of the class S3Service"""
-        self.client = boto3.client(
-            "s3",
-            aws_access_key_id=config["s3"]["aws_access_key_id"],
-            aws_secret_access_key=config["s3"]["aws_secret_access_key"],
-        )
+        self.config=config
         self.logger = logger
 
-    def upload_file(self, file,bucket_name, bucket_path, key):
-        """This method gets file from sftp,uploads into s3 bucket in the given path"""
+    def s3_client(self):
+        """This method connect to s3 client with the aws credentials"""
         try:
-            file = self.client.put_object(Bucket=bucket_name, Body=file, Key=bucket_path + key)
-            self.logger.info("The file has been uploaded to s3")
-        except Exception as err:
-            print("Cannot upload in s3", err)
-            self.logger.error("Cannot be uploaded in s3 in the given path")
-            file = None
-        return file
+            client = boto3.client(
+                "s3",
+                aws_access_key_id=self.config["s3"]["aws_access_key_id"],
+                aws_secret_access_key=self.config["s3"]["aws_secret_access_key"],
+            )
+            self.logger.info("Successfully connected to s3 client")
+        except (ClientError,Exception) as err:
+            self.logger.error("Cannot Connect to the s3 client with the given credentials %s",err)
+            client=None
+        return client
 
     def get_list_of_files_in_s3(self,bucket_name, bucket_path):
         """This method get the list of files from the given bucket and path in s3"""
         file_list = []
         try:
-            paginator = self.client.get_paginator("list_objects_v2")
+            client=self.s3_client()
+            paginator = client.get_paginator("list_objects_v2")
             for objects in paginator.paginate(Bucket=bucket_name, Prefix=bucket_path):
                 for obj in objects["Contents"]:
                     if obj["Key"].endswith(".zip"):
@@ -39,3 +39,15 @@ class S3Details:
             self.logger.error("Cannot get the list of files from s3 in the given path %s", err)
             file_list = None
         return file_list
+    
+    def upload_file(self, file,bucket_name, bucket_path, key):
+        """This method gets file from sftp,uploads into s3 bucket in the given path"""
+        try:
+            client=self.s3_client()
+            file = client.put_object(Bucket=bucket_name, Body=file, Key=bucket_path + key)
+            self.logger.info("The file has been uploaded to s3")
+        except Exception as err:
+            print("Cannot upload in s3", err)
+            self.logger.error("Cannot be uploaded in s3 in the given path")
+            file = None
+        return file
