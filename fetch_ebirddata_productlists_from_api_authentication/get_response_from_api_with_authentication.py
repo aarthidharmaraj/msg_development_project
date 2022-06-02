@@ -45,8 +45,7 @@ class PullDataFromEBirdApi:
     def check_range_for_givendate(self, date_check):
         """This method fetches data from api for the given date and region
         parameters:
-        date : the date to fetch details from api
-        region code : the country on which datas to be fetched"""
+        date_check : the date to fetch details from api"""
 
         try:
             striped_date = datetime.strptime(str(date_check), "%Y-%m-%d")
