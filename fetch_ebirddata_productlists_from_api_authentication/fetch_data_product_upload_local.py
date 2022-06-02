@@ -17,7 +17,7 @@ class ApiDataPartitionUploadLocal:
                 os.makedirs(new_dir)
             shutil.copy(copy_source, new_dir)
             os.remove(copy_source)
-            print(f"Successfully uploaded file'{file_name}' in the given path'{partition_path}'\n")
+            print("Successfully uploaded file in the given path\n")
             self.logger.info(
                 "Successfully uploaded file %s in the given path %s", file_name, partition_path
             )
