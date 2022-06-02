@@ -1,9 +1,8 @@
-""" This module authenticate api with api key and get 
-historical observations and checklist Feed from eBird Api based on given date"""
+""" This module authenticate api with api key and get historical observations and
+checklist Feed from eBird Api based on given date"""
 from datetime import date, datetime
 import requests
-import pandas as pd
-from api_key_encryption import EncryptDecryptApiKey
+from cryptography.fernet import Fernet
 
 
 class PullDataFromEBirdApi:
@@ -17,14 +16,27 @@ class PullDataFromEBirdApi:
         self.base_url = self.config["eBird_api_datas"]["basic_url"]
         self.min_year = 1800
         self.year_limit = int(date.today().year)
-        self.api_key = EncryptDecryptApiKey().decrypt_from_config()
+
+    def decrypt_api_key_from_config(self):
+        """This method gets the encrypted api key from config, decrypt it and return the data"""
+        try:
+            encrypt_key = self.config["eBird_api_datas"]["api_key"]
+            fernet_key = self.config["eBird_api_datas"]["fernet_key"]
+            fernet = Fernet(fernet_key)
+            self.logger.info("Got the encrypted key from config %s", encrypt_key)
+            decrypt_token = fernet.decrypt(encrypt_key.encode()).decode()
+            self.logger.info("Successfully decrypted the key %s", decrypt_token)
+        except Exception as err:
+            decrypt_token = None
+            self.logger.error("Cannot decrypt the api key from config %s", err)
+        return decrypt_token
 
     def authenticate_api_with_key(self):
         """This method decrypt the api key from config file and create
         the header and authenticate the api with api key"""
         try:
-            # print(self.api_key)
-            header = {"X-eBirdApiToken": self.api_key}
+            api_key_token = self.decrypt_api_key_from_config()
+            header = {"X-eBirdApiToken": api_key_token}
         except Exception as err:
             self.logger.error("Cannot generate the header with the given api_key %s", err)
             header = None
@@ -39,71 +51,59 @@ class PullDataFromEBirdApi:
         try:
             striped_date = datetime.strptime(str(date_check), "%Y-%m-%d")
             if striped_date.year in range(self.min_year, self.year_limit + 1):
-                date = striped_date
+                get_date = striped_date
             else:
-                self.logger.error("No response are available for given year%s", date.year)
-                print("No response are available for given year", date.year)
-                date = None
+                self.logger.error("No response are available for given year%s", get_date.year)
+                print("No response are available for given year", get_date.year)
+                get_date = None
         except Exception as err:
             self.logger.error("Cannot get the response or endpoint for the given date %s", err)
-            date = None
-        return date
+            get_date = None
+        return get_date
 
-    def fetch_historical_data_from_api(self, date_check, region_code):
+    def fetch_historical_data_from_api(self, date_check, reg_code, ep_value):
         """This method fetches historical observations from eBirdapi for the given date and region
         parameters:
         date_check : the date to fetch details from api
         region code : the country on which datas to be fetched"""
         try:
-            date = self.check_range_for_givendate(date_check)
-            endpoint = f"data/obs/{region_code}/historic/{date.year}/{date.month}/{date.day}"
-            print(endpoint)
-            response = self.get_response_from_endpoint(endpoint)
+            get_date = self.check_range_for_givendate(date_check)
+            endpoint = (
+                f"{ep_value}/{reg_code}/historic/{get_date.year}/{get_date.month}/{get_date.day}"
+            )
+            response = self.get_response_from_endpoint(endpoint, reg_code)
         except Exception as err:
             self.logger.error(
-                "Cannot generate the endpoint for getting historicall observations for the given date %s",
+                "Cannot generate the endpoint for getting historicall data on given date %s",
                 err,
             )
             response = None
         return response
 
-    def fetch_checklist_feed_from_api(self, date_check, region_code):
-        """This method fetches Checklist feed from eBirdapi for the given date and region
-        parameters:
-        date_check : the date to fetch details from api
-        region code : the country on which datas to be fetched"""
+    def fetch_checklist_feed_top100_contributors_from_api(self, date_check, reg_code, ep_value):
+        """This method fetches top100_contributors or checklist feed from eBirdapi
+        for the given date and region
+        parameters: date_check : the date to fetch details from api
+                    reg_code : the country on which datas to be fetched
+                    ep_value : the value for the endpoint"""
         try:
-            date = self.check_range_for_givendate(date_check)
-            endpoint = f"product/lists/{region_code}/{date.year}/{date.month}/{date.day}"
-            response = self.get_response_from_endpoint(endpoint)
+            get_date = self.check_range_for_givendate(date_check)
+            endpoint = f"{ep_value}/{reg_code}/{get_date.year}/{get_date.month}/{get_date.day}"
+            self.logger.info("Generated the endpoint for fetching datas from api")
+            response = self.get_response_from_endpoint(endpoint, reg_code)
         except Exception as err:
             self.logger.error(
-                "Cannot generate the endpoint for getting Checklist feed for the given date %s", err
-            )
-            response = None
-        return response
-
-    def fetch_top100_contributors_from_api(self, date_check, region_code):
-        """This method fetches top100_contributors from eBirdapi for the given date and region
-        parameters:
-        date_check : the date to fetch details from api
-        region code : the country on which datas to be fetched"""
-        try:
-            date = self.check_range_for_givendate(date_check)
-            endpoint = f"product/top100/{region_code}/{date.year}/{date.month}/{date.day}"
-            response = self.get_response_from_endpoint(endpoint)
-        except Exception as err:
-            self.logger.error(
-                "Cannot generate the endpoint for getting top100_contributors for the given date %s",
+                "Cannot generate the endpoint for getting top100_contributors or checklist_feed for the given date %s",
                 err,
             )
             response = None
         return response
 
-    def get_response_from_endpoint(self, endpoint):
+    def get_response_from_endpoint(self, endpoint, region):
         """This method gets the json response from the eBirdapi for the
         given endpoint and return as a dataframe
-        parameter: endpoint - endpoint for getting the response"""
+        parameter: endpoint - endpoint for getting the response
+                    region - the country on which data is needed"""
         try:
             header = self.authenticate_api_with_key()
             request_url = self.base_url + endpoint
@@ -111,19 +111,21 @@ class PullDataFromEBirdApi:
             if response.status_code == 200:
                 response_json = response.json()
                 self.logger.info(
-                    f"Got the response from api for given date with status{response.status_code}"
+                    "Got the response from api for given region %s with status %s",
+                    region,
+                    response.status_code,
                 )
             else:
                 print("Cannot get the response from api", response.status_code)
-                self.logger.error("It gives a failure response with code %s", response.status_code)
+                self.logger.error(
+                    "It gives a failure response with code %s for region %s",
+                    response.status_code,
+                    region,
+                )
                 response_json = None
 
         except Exception as err:
-            self.logger.error(f"Cannot get the response from api due to problem in api{err}")
+            self.logger.error("Cannot get the response from api due to problem in api %s", err)
             print("No response from api", err)
             response_json = None
-        return pd.DataFrame(response_json)
-
-
-# obj=PullDataFromEBirdApi("logger","config")
-# obj.authenticate_api_with_key()
+        return response_json
