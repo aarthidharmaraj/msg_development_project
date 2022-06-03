@@ -1,6 +1,6 @@
 """This module get historical observations, top 100 contributors and
- checklist feed from eBird Api based on region code and partition them 
-based on date and upload to s3"""
+checklist feed from eBird Api based on region code and partition them based 
+on date and upload to s3"""
 
 from datetime import datetime, timedelta
 import os
@@ -21,20 +21,16 @@ class HistoricDataProductsUploadS3:
     """This class has methods to get datas from api for the given date and
     partition them based on date and upload to s3"""
 
-    def __init__(self, start_date, end_date):
+    def __init__(self, start_date, end_date, region):
         """this is the init method for the class HistoricDataProductsUploadS3"""
         self.logger = datas["logger"]
         self.startdate = start_date
         self.enddate = end_date
-        self.region_code = ast.literal_eval(datas["config"]["eBird_api_datas"]["region_code"])
+        self.region_code = region
+        self.section = datas["config"]["eBird_api_datas"]
         self.s3_client = S3Details(self.logger, datas["config"])
         self.local = ApiDataPartitionUploadLocal(self.logger)
-        self.local_path = LoggerPath.local_download_path("historicdata_products_from_api")
         self.api = PullDataFromEBirdApi(self.logger, datas["config"])
-        self.s3path = datas["config"]["eBird_api_datas"]["s3_path"]
-        self.bucket = datas["config"]["eBird_api_datas"]["bucket"]
-        self.last_run = datas["config"]["eBird_api_datas"]["last_run_date"]
-        self.endpoint = ast.literal_eval(datas["config"]["eBird_api_datas"]["endpoint"])
         self.logger.info("Successfully created the instance of the class")
 
     def get_details_for_givendates(self):
@@ -53,8 +49,9 @@ class HistoricDataProductsUploadS3:
                     self.logger.info("Cannot fetch details as startdate is greater than enddate")
                     sys.exit("script was terminated since startdate is greater than enddate")
             else:
-                if self.last_run:
-                    last_run = datetime.strptime(self.last_run, "%Y-%m-%d").date()
+                last_runned = self.section["last_run_date"]
+                if last_runned:
+                    last_run = datetime.strptime(last_runned, "%Y-%m-%d").date()
                     if last_run <= self.startdate:
                         dates = {"date1": self.startdate, "date2": last_run}
                         self.logger.info(
@@ -68,14 +65,44 @@ class HistoricDataProductsUploadS3:
                         )
                         sys.exit("script was terminated since lastdate is greater than startdate")
                 else:
-                    dates = {"date1": self.startdate, "date2": self.startdate}
+                    dates = {"date1": datetime.now().date(), "date2": self.startdate}
+                    self.logger.info("Fetching details from startdate to current date")
         except Exception as err:
             dates = None
             self.logger.info("Cannot get the details for the given dates %s", err)
             print("script was terminated when fetching for given dates")
         return dates
 
-    def get_data_from_api_for_eachdate(self, date1, date2):
+    def check_for_regions_available(self, dates):
+        """This method checks for the regions available, if it is new fetch from the start
+        date,or else fetch for the given dates
+        Parameters : endpoint - title of the endpoint
+                    ep_value - The value of the endpoint to be fetched"""
+        try:
+            new_region = []
+            available_regions = self.section["region"]
+            print(available_regions)
+            #check for the new region and fetch datas
+            if self.region_code and self.region_code not in available_regions:
+                new_region.append(self.region_code)
+                self.logger.info(
+                    "Getting details for newly added region %s between current date and 2020-01-01",
+                    new_region,
+                )
+                self.get_data_from_api_for_eachdate(
+                    datetime.now().date(),
+                    datetime.strptime("2022-06-01", "%Y-%m-%d").date(),
+                    new_region,
+                )
+            code_list = available_regions.split(",")
+            self.get_data_from_api_for_eachdate(dates["date1"], dates["date2"], code_list)
+        except Exception as err:
+            self.logger.error("Cannot fetch for the given region %s", err)
+            print(err)
+            code_list = None
+        return code_list
+
+    def get_data_from_api_for_eachdate(self, date1, date2, regions_list):
         """This method gets data from api for each date between the start and end dates"""
         try:
             day_count = (date1 - date2).days + 1
@@ -84,28 +111,25 @@ class HistoricDataProductsUploadS3:
                 single_date = date2 + timedelta(day)
                 print(single_date)
                 self.logger.info("Getting eBird api data for %s", single_date)
-                for epoint, ep_value in self.endpoint.items():  # Fetch for the available endpoints
-                    for (
-                        region,
-                        region_code,
-                    ) in self.region_code.items():  # fetch for the available regions
-                        self.logger.info("Getting data from api for endpoint %s", epoint)
+                endpoint = ast.literal_eval(self.section["endpoint"])
+                for epoint, ep_value in endpoint.items():  # Fetch for the available endpoints
+                    for region in regions_list:
                         self.fetch_dataframe_from_api_for_endpoints(
-                            region, region_code, single_date, epoint, ep_value
+                            region, single_date, epoint, ep_value
                         )
         except Exception as err:
             self.logger.error("Cannot get the date %s", err)
             single_date = None
         return single_date
 
-    def fetch_dataframe_from_api_for_endpoints(self, region, region_code, date, endpoint, ep_value):
+    def fetch_dataframe_from_api_for_endpoints(self, region_code, date, endpoint, ep_value):
         """This method fetches dataframe from api for all the endpoints and convert to
         json make partition and upload to s3
         parameters: region and region_code- the country and its code on which datas to be fetched
                     endpoint and ep_value - the endpoint and its value-path
                     date - the date for which datas are needed"""
         try:
-            print(endpoint, "for", region)
+            print(endpoint, "for", region_code)
             if endpoint == "historical_data":  # chek the endpoints and fetch data
                 response = self.api.fetch_historical_data_from_api(date, region_code, ep_value)
             else:
@@ -114,9 +138,10 @@ class HistoricDataProductsUploadS3:
                 )
             if response is not None:  # create dataframe if response is not None
                 df_data = pd.DataFrame(response)
-                self.create_json_upload_s3(df_data, date, region, endpoint)
+                self.create_json_upload_s3(df_data, date, region_code, endpoint)
             else:
-                print("response id None")
+                print("response is None")
+                df_data = None
                 self.logger.info("Cannot create a dataframe for an empty response %s", response)
         except Exception as err:
             self.logger.error("Cannot get the response from api %s", err)
@@ -129,23 +154,25 @@ class HistoricDataProductsUploadS3:
             self.logger.info(
                 "Got the dataframe for the endpoint %s on %s for %s", endpoint, date, region
             )
-            partition_path = self.put_partition_path(region, date, endpoint)
+            s3_path = self.section["s3_path"]
+            local_path = LoggerPath.local_download_path("eBird_api_datas")
+            partition_path = self.put_partition_path(s3_path, region, date, endpoint)
             file_name = f"{endpoint}_on_{date}.json"
             dataframe_data.to_json(
-                self.local_path + "/" + file_name,
+                local_path + "/" + file_name,
                 orient="records",
                 lines=True,
             )
             self.logger.info("Created the json file for %s on %s for %s", endpoint, date, region)
-            copy_source = self.local_path + "/" + file_name
+            copy_source = local_path + "/" + file_name
             self.logger.info("Uploading the json file to local s3 path")
             file = self.local.upload_partition_s3_local(
-                self.local_path,
+                local_path,
                 copy_source,
                 file_name,
                 partition_path,
             )
-            # file=self.upload_to_s3(copy_source,partition_path, file_name)
+            # file=self.upload_to_s3(s3_path,copy_source,partition_path, file_name)
         except Exception as err:
             self.logger.error(
                 "Cannot create a json file for %s on %s for %s", endpoint, date, region
@@ -154,16 +181,15 @@ class HistoricDataProductsUploadS3:
             file = None
         return file
 
-    def put_partition_path(self, region, date, endpoint):
+    def put_partition_path(self, s3_path, region, date, endpoint):
         """This method will make partion path based on year,month,date
         and avoid overwrite of file and upload to local
         parameters: region- the country on which datas to be fetched
                     date - the date for which datas are needed"""
         try:
             partition_path = date.strftime(
-                f"{self.s3path}/{endpoint}/{region}/pt_year=%Y/pt_month=%m/pt_day=%d"
+                f"{s3_path}/{endpoint}/pt_region={region}/pt_year=%Y/pt_month=%m/pt_day=%d"
             )
-            print(partition_path)
             self.logger.info(
                 "Made the partition based on endpoint,region and date %s", partition_path
             )
@@ -173,7 +199,7 @@ class HistoricDataProductsUploadS3:
             partition_path = None
         return partition_path
 
-    def upload_file_to_s3(self, source, partition_path, file_name):
+    def upload_file_to_s3(self, bucket_path, source, partition_path, file_name):
         """This method used to upload the file to s3 in the partiton created
         parameters: file_name - name of the file to be uploaded
                     source - the source which has the file and its data
@@ -183,7 +209,7 @@ class HistoricDataProductsUploadS3:
             self.logger.info(
                 "The file %s being uploaded to s3 in the given path %s", file_name, key
             )
-            file = self.s3_client.upload_file(source, self.bucket, self.s3path, key)
+            file = self.s3_client.upload_file(source, self.section["bucket"], bucket_path, key)
             print("the file has been uploaded to s3 in the given path")
             os.remove(source)
         except Exception as err:
@@ -205,6 +231,27 @@ class HistoricDataProductsUploadS3:
             last_run = None
         return last_run
 
+    def update_config_if_region_not_exixts(self):
+        """This method updates the region in config if it does not exits"""
+        try:
+            available_code = self.section["region"]
+            if self.region_code in available_code:
+                regions = None
+                self.logger.info("The given region is available in the list")
+            else:
+                regions = self.section.get("region")
+                datas["config"].set("eBird_api_datas", "region", regions + "," + self.region_code)
+                with open(datas["parent_dir"] + "/details.ini", "w", encoding="utf-8") as file:
+                    datas["config"].write(file)
+                self.logger.info(
+                    "Added the new region %s in the available regions in config file",
+                    self.region_code,
+                )
+        except Exception as err:
+            self.logger.error("Cannot update the new region in config %s", err)
+            regions = None
+        return regions
+
 
 def check_valid_date(date):
     """This method checks for the valid date entered and returns in datetime.date() format"""
@@ -222,7 +269,7 @@ def check_valid_date(date):
             date,
         )
         valid_date = None
-        msg = f"{date} not valid date.It must be in format YYYY-MM-DD and not greater then current date"
+        msg = f"{date} not valid.It must be in format YYYY-MM-DD and not greater then current date"
         raise argparse.ArgumentTypeError(msg)
     return valid_date
 
@@ -240,14 +287,17 @@ def main():
     )
     parser.add_argument(
         "--enddate",
-        help="The date should be in - format YYYY-MM-DD",
+        help="The date should be in format YYYY-MM-DD",
         type=check_valid_date,
     )
+    parser.add_argument(
+        "--region", help="Enter the country code for which datas are to be fetched", type=str
+    )
     args = parser.parse_args()
-
-    api_data = HistoricDataProductsUploadS3(args.startdate, args.enddate)
+    api_data = HistoricDataProductsUploadS3(args.startdate, args.enddate, args.region)
     dates = api_data.get_details_for_givendates()
-    api_data.get_data_from_api_for_eachdate(dates["date1"], dates["date2"])
+    api_data.check_for_regions_available(dates)
+    api_data.update_config_if_region_not_exixts()
     api_data.last_date_of_execution()
 
 
