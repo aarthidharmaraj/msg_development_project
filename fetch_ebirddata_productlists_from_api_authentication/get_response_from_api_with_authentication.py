@@ -9,19 +9,18 @@ class PullDataFromEBirdApi:
     """This class has methods to pull historical observations and checklist Feed from
     api with api key authentication based on the given date"""
 
-    def __init__(self, logger, config):
+    def __init__(self, logger, config_section):
         """This is the init method for the class PullDataFromEBirdApi"""
         self.logger = logger
-        self.config = config
-        self.base_url = self.config["eBird_api_datas"]["basic_url"]
+        self.section = config_section
         self.min_year = 1800
         self.year_limit = int(date.today().year)
 
     def decrypt_api_key_from_config(self):
         """This method gets the encrypted api key from config, decrypt it and return the data"""
         try:
-            encrypt_key = self.config["eBird_api_datas"]["api_key"]
-            fernet_key = self.config["eBird_api_datas"]["fernet_key"]
+            encrypt_key = self.section["api_key"]
+            fernet_key = self.section["fernet_key"]
             fernet = Fernet(fernet_key)
             self.logger.info("Got the encrypted key from config %s", encrypt_key)
             decrypt_token = fernet.decrypt(encrypt_key.encode()).decode()
@@ -105,7 +104,8 @@ class PullDataFromEBirdApi:
                     region - the country on which data is needed"""
         try:
             header = self.authenticate_api_with_key()
-            request_url = self.base_url + endpoint
+            base_url = self.section["basic_url"]
+            request_url = base_url + endpoint
             response = requests.get(request_url, headers=header)
             if response.status_code == 200:
                 response_json = response.json()
