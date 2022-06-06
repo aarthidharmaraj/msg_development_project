@@ -2,7 +2,7 @@
 checklist feed from eBird Api based on region code and partition them based 
 on date and upload to s3"""
 
-from datetime import datetime, timedelta
+from datetime import datetime,date,timedelta
 import os
 import sys
 import ast
@@ -13,9 +13,9 @@ from logger_path.logger_object_path import LoggerPath
 from fetch_data_product_upload_local import ApiDataPartitionUploadLocal
 from get_response_from_api_with_authentication import PullDataFromEBirdApi
 
-# from check_api import PullDataFromEBirdApi
 datas = LoggerPath.logger_object("historicdata_products_from_api")
-
+current_date = datetime.now().date()
+initial_run_date=date(date.today().year, 1, 1)
 
 class HistoricDataProductsUploadS3:
     """This class has methods to get datas from api for the given date and
@@ -36,6 +36,7 @@ class HistoricDataProductsUploadS3:
     def get_details_for_givendates(self):
         """This method is to get the employee details for the given dates"""
         try:
+            last_runned = self.section["last_run_date"]
             # check the given dates ranges
             if self.enddate:
                 if self.startdate < self.enddate:
@@ -48,25 +49,24 @@ class HistoricDataProductsUploadS3:
                 else:
                     self.logger.info("Cannot fetch details as startdate is greater than enddate")
                     sys.exit("script was terminated since startdate is greater than enddate")
-            else:
-                last_runned = self.section["last_run_date"]
-                if last_runned:
-                    last_run = datetime.strptime(last_runned, "%Y-%m-%d").date()
-                    if last_run <= self.startdate:
-                        dates = {"date1": self.startdate, "date2": last_run}
-                        self.logger.info(
-                            "Getting api datas between lastdate %s and current date %s",
-                            last_run,
-                            self.startdate,
-                        )
-                    else:
-                        self.logger.info(
-                            "Cannot fetch details as lastdate is greater than startdate"
-                        )
-                        sys.exit("script was terminated since lastdate is greater than startdate")
+            elif last_runned:
+                last_run = datetime.strptime(last_runned, "%Y-%m-%d").date()
+                if last_run <= self.startdate:
+                    dates = {"date1": self.startdate, "date2": last_run}
+                    self.logger.info(
+                        "Getting api datas between lastdate %s and current date %s",
+                        last_run,
+                        self.startdate,
+                    )
                 else:
-                    dates = {"date1": datetime.now().date(), "date2": self.startdate}
-                    self.logger.info("Fetching details from startdate to current date")
+                    self.logger.info("Cannot fetch details as lastdate is greater than startdate")
+                    dates = {"date1": self.startdate, "date2": self.startdate}
+                    self.logger.info("Fetching details for startdate alone")
+            else:
+                dates = {"date1": current_date, "date2": initial_run_date}
+                self.logger.info(
+                    "Fetching datas from api between 2022-01-01 and current date %s", current_date
+                )
         except Exception as err:
             dates = None
             self.logger.info("Cannot get the details for the given dates %s", err)
@@ -82,7 +82,7 @@ class HistoricDataProductsUploadS3:
             new_region = []
             available_regions = self.section["region"]
             print(available_regions)
-            #check for the new region and fetch datas
+            # check for the new region and fetch datas
             if self.region_code and self.region_code not in available_regions:
                 new_region.append(self.region_code)
                 self.logger.info(
@@ -90,8 +90,8 @@ class HistoricDataProductsUploadS3:
                     new_region,
                 )
                 self.get_data_from_api_for_eachdate(
-                    datetime.now().date(),
-                    datetime.strptime("2022-06-01", "%Y-%m-%d").date(),
+                    current_date,
+                    initial_run_date,
                     new_region,
                 )
             code_list = available_regions.split(",")
@@ -221,7 +221,7 @@ class HistoricDataProductsUploadS3:
         """If there is no end date,this method get last date of api run
         and upadates it to the config file"""
         if not self.enddate:
-            last_run = datetime.now().date()
+            last_run = current_date
             datas["config"].set("eBird_api_datas", "last_run_date", str(last_run))
             with open(datas["parent_dir"] + "/details.ini", "w", encoding="utf-8") as file:
                 datas["config"].write(file)
@@ -235,7 +235,9 @@ class HistoricDataProductsUploadS3:
         """This method updates the region in config if it does not exits"""
         try:
             available_code = self.section["region"]
-            if self.region_code in available_code:
+            if (
+                self.region_code in available_code
+            ):  # check the given region is available orelse update it
                 regions = None
                 self.logger.info("The given region is available in the list")
             else:
@@ -257,7 +259,7 @@ def check_valid_date(date):
     """This method checks for the valid date entered and returns in datetime.date() format"""
     try:
         date = datetime.strptime(date, "%Y-%m-%d").date()
-        if date <= datetime.now().date():
+        if date <= current_date:  # checks with current date
             valid_date = date
             datas["logger"].info("The given date is a valid date %s", valid_date)
         else:
@@ -283,7 +285,7 @@ def main():
         "--startdate",
         help="The date should be in format YYYY-MM-DD",
         type=check_valid_date,
-        default=datetime.now().date(),
+        default=current_date,
     )
     parser.add_argument(
         "--enddate",
