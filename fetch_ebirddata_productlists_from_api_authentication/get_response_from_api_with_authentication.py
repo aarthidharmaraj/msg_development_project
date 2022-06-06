@@ -16,11 +16,10 @@ class PullDataFromEBirdApi:
         self.min_year = 1800
         self.year_limit = int(date.today().year)
 
-    def decrypt_api_key_from_config(self):
+    def decrypt_api_key_from_config(self,encrypt_key,fernet_key):
         """This method gets the encrypted api key from config, decrypt it and return the data"""
         try:
-            encrypt_key = self.section["api_key"]
-            fernet_key = self.section["fernet_key"]
+            # fernet_key = self.section["fernet_key"]
             fernet = Fernet(fernet_key)
             self.logger.info("Got the encrypted key from config %s", encrypt_key)
             decrypt_token = fernet.decrypt(encrypt_key.encode()).decode()
@@ -34,8 +33,11 @@ class PullDataFromEBirdApi:
         """This method decrypt the api key from config file and create
         the header and authenticate the api with api key"""
         try:
-            api_key_token = self.decrypt_api_key_from_config()
+            encrypt_key = self.section["api_key"]
+            fernet_key = self.section["fernet_key"]
+            api_key_token = self.decrypt_api_key_from_config(encrypt_key,fernet_key)
             header = {"X-eBirdApiToken": api_key_token}
+            self.logger.info("Authentication the api with api_key and passed it in header")
         except Exception as err:
             self.logger.error("Cannot generate the header with the given api_key %s", err)
             header = None
