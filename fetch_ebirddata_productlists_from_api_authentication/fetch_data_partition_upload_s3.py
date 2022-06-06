@@ -30,7 +30,7 @@ class HistoricDataProductsUploadS3:
         self.section = datas["config"]["eBird_api_datas"]
         self.s3_client = S3Details(self.logger, datas["config"])
         self.local = ApiDataPartitionUploadLocal(self.logger)
-        self.api = PullDataFromEBirdApi(self.logger, datas["config"])
+        self.api = PullDataFromEBirdApi(self.logger, self.section)
         self.logger.info("Successfully created the instance of the class")
 
     def get_details_for_givendates(self):
