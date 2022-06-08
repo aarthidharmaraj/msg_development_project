@@ -10,7 +10,6 @@ class PullDataFromFreeSoundApi:
         self.logger=logger
         self.section=section
     
-    
     def decrypt_api_key_from_config(self,encrypt_key,fernet_key):
         """This method gets the encrypted api key from config, decrypt it and return the data"""
         try:
@@ -73,11 +72,11 @@ class PullDataFromFreeSoundApi:
                     response = requests.get(request_url,params=params)
                     if response.status_code == 200:
                         response_json = response.json()
-                        result_data=response_json["results"]
+                        result_data=[filter(None,response_json["results"])]
                         self.logger.info(
                             f"Got the response from api for given year with status{response.status_code}"
                         )
-                        df_data = pd.DataFrame(result_data)
+                        df_data = pd.DataFrame(result_data,index=[0])
                         chunk_data.append(df_data)
                     #    and response_json['next']<=f"https://freesound.org/apiv2/sounds/636917/similar/?&weights=&target=636917&page=10":
                         if response_json['next'] :
