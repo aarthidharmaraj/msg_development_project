@@ -55,7 +55,7 @@ class FetchDataFromApiUploadS3:
             for date in date_created:
                 new_df=dataframe[dataframe.created==date]
                 if not new_df.empty:
-                    file_name=f"{(date.split('T')[0])}.json"
+                    file_name=f"{self.username}_{(date.split('T')[0])}.json"
                     self.create_json_upload_s3(new_df,file_name,date.split('T')[0])
         except Exception as err:
             self.logger.error("Cannot get the date fro the dataframe %s",err)
