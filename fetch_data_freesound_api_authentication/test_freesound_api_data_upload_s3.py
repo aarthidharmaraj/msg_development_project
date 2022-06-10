@@ -101,7 +101,7 @@ def username():
 @pytest.fixture
 def wrong_username():
     """This method returns the wrong username for getting user packs"""
-    return "aaaaa"
+    return "sdj"
 
 
 @pytest.fixture
@@ -152,9 +152,9 @@ def partition_path(date):
 
 
 @pytest.fixture
-def file_name(date, username):
+def file_name(username):
     """This method returns the file name"""
-    return f"{username}_{date}.json"
+    return f"{username}_116.json"
 
 
 @pytest.fixture
@@ -260,10 +260,11 @@ def response(base_url, username, params):
 
 
 @pytest.fixture
-def dataframe(response):
+def dataframe(config_section,logger_obj,endpoint):
     """This method returns the dataframe from the response"""
-    return pd.DataFrame(response)
-
+    obj=PullDataFromFreeSoundApi(config_section,logger_obj)
+    dataframe=obj.get_response_from_api_pagination(endpoint)
+    return dataframe
 
 @pytest.fixture
 def copy_source(upload_path, file_name):
@@ -326,12 +327,10 @@ class TestUploadLocal:
         self,
         logger_obj,
         dataframe,
-        username,
+        file_name,
         upload_path,
         copy_source,
-        file_name,
         partition_path,
-        date,
     ):
         """This method will test for uploading json file to local file
         in class  ApiDataPartitionUploadLocal is done"""
@@ -340,7 +339,7 @@ class TestUploadLocal:
         local_file = self.obj_local.upload_partition_s3_local(
             upload_path, copy_source, file_name, partition_path
         )
-        assert local_file == f"{username}_{date}.json"
+        assert local_file ==file_name
 
     @pytest.mark.xfail
     def test_upload_file_to_local_path_is_not_done(
@@ -400,11 +399,12 @@ class TestFreeSoundApi:
         dataframe = self.api.fetch_user_sounds_packs_from_api(username)
         assert isinstance(dataframe, pd.DataFrame)
 
-    # def test_fetch_user_packs_from_api_notdone(self,config_section,logger_obj,wrong_username):
-    #     """This method tests for fetching the details of user packs from api based on the username is notdone"""
-    #     self.api=PullDataFromFreeSoundApi(config_section,logger_obj)
-    #     dataframe=self.api.fetch_user_sounds_packs_from_api(wrong_username)
-    #     assert dataframe is None
+    @pytest.mark.xfail
+    def test_fetch_user_packs_from_api_notdone(self,config_section,logger_obj,wrong_username):
+        """This method tests for fetching the details of user packs from api based on the username is notdone"""
+        self.api=PullDataFromFreeSoundApi(config_section,logger_obj)
+        dataframe=self.api.fetch_user_sounds_packs_from_api(wrong_username)
+        assert dataframe.empty
 
 
 class TestFreeSoundApiUploadS3:
@@ -427,11 +427,11 @@ class TestFreeSoundApiUploadS3:
         response = self.obj.fetch_response_from_api_for_endpoints()
         assert response is None
 
-    # def test_get_date_from_dataframe_done(self,soundid,username,dataframe,endpoint):
-    #     """This method tests for getting date from dataframe is done"""
-    #     self.obj=FetchDataFromApiUploadS3(soundid,username,endpoint)
-    #     date=self.obj.get_date_from_dataframe(dataframe)
-    #     assert isinstance(date,pd.DataFrame)
+    def test_get_date_from_dataframe_done(self,soundid,username,dataframe,endpoint):
+        """This method tests for getting date from dataframe is done"""
+        self.obj=FetchDataFromApiUploadS3(soundid,username,endpoint)
+        date=self.obj.get_date_from_dataframe(dataframe)
+        assert isinstance(date,pd.DataFrame)
 
     @pytest.mark.xfail
     def test_get_date_from_dataframe_notdone(self, soundid, username, endpoint):
