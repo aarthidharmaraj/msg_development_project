@@ -75,17 +75,15 @@ class PullDataFromFreeSoundApi:
             params = self.authenticate_api_with_key()
             request_url = base_url + endpoint
             while True:
-                print(request_url)
                 response = requests.get(request_url, params=params)
                 if response.status_code == 200:
                     response_json = response.json()
-                    result_data = [filter(None, response_json["results"])]
+                    result_data =list(filter(None,response_json["results"]))
                     self.logger.info(
                     f"Got the response from api for given year with status{response.status_code}"
                     )
-                    df_data = pd.DataFrame(result_data, index=[0])
+                    df_data = pd.DataFrame(result_data)
                     chunk_data.append(df_data)
-
                     if response_json["next"]:
                         request_url = response_json["next"]
                         self.logger.info("Got the next url of %s endpoint", endpoint)
@@ -99,7 +97,6 @@ class PullDataFromFreeSoundApi:
                     )
                     df_data = None
             df_data = pd.concat(chunk_data)
-            # print(df_data)
         except Exception as err:
             self.logger.error(f"Cannot get the response from api due to problem in api{err}")
             print("No response from api", err)
