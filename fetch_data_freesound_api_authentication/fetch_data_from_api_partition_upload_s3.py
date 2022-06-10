@@ -5,6 +5,9 @@ in the given path """
 from datetime import datetime
 import os
 import argparse
+import string
+
+from pandas import Int32Dtype
 from aws_s3.s3_details import S3Details
 from logger_path.logger_object_path import LoggerPath
 from fetch_data_partition_upload_local import ApiDataPartitionUploadLocal
@@ -63,14 +66,15 @@ class FetchDataFromApiUploadS3:
         from dataframe"""
         try:
             date_created = list(dataframe.created)
-            print(date_created)
             for date in date_created:
                 new_df = dataframe[dataframe.created == date]
                 if not new_df.empty:
-                    file_name = f"{self.username}_{(date.split('T')[0])}.json"
+                    file_name=f"{self.username}_{new_df.id.to_string(index=False)}.json"
+                    print(file_name)
                     self.create_json_upload_s3(new_df, file_name, date.split("T")[0])
         except Exception as err:
             new_df = None
+            print(err)
             self.logger.error("Cannot get the date from the dataframe %s", err)
         return new_df
 
