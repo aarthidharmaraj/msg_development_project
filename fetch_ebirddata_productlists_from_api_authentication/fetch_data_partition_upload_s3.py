@@ -8,6 +8,7 @@ import sys
 import ast
 import argparse
 import pandas as pd
+import pycountry
 from aws_s3.s3_details import S3Details
 from logger_path.logger_object_path import LoggerPath
 from fetch_data_product_upload_local import ApiDataPartitionUploadLocal
@@ -275,6 +276,23 @@ def check_valid_date(date):
         raise argparse.ArgumentTypeError(msg)
     return valid_date
 
+def check_valid_region(code):
+    """This method checks the given region or country code is a valid country code or not"""
+    try:
+        codes=[co.alpha_2 for co in list(pycountry.countries)]
+        if code in codes:
+            valid_code=code
+            datas["logger"].info("The given region is a valid region %s", valid_code)
+        else:
+            datas["logger"].info("Not a valid region code")
+            raise Exception
+    except Exception as err:
+        datas["logger"].info("%s not valid region",code)
+        valid_code = None
+        msg = f"{code} not available region code.Cannot get data for that"
+        raise argparse.ArgumentTypeError(msg)
+    return valid_code
+    
 
 def main():
     """This is the main method for the class"""
@@ -293,7 +311,7 @@ def main():
         type=check_valid_date,
     )
     parser.add_argument(
-        "--region", help="Enter the country code for which datas are to be fetched", type=str
+        "--region", help="Enter the country code for which datas are to be fetched", type=check_valid_region
     )
     args = parser.parse_args()
     api_data = HistoricDataProductsUploadS3(args.startdate, args.enddate, args.region)
