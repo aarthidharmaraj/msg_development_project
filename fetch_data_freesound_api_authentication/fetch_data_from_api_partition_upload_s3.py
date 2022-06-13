@@ -5,9 +5,6 @@ in the given path """
 from datetime import datetime
 import os
 import argparse
-import string
-
-from pandas import Int32Dtype
 from aws_s3.s3_details import S3Details
 from logger_path.logger_object_path import LoggerPath
 from fetch_data_partition_upload_local import ApiDataPartitionUploadLocal
