@@ -163,8 +163,8 @@ def valid_year(year):
     except ValueError:
         datas["logger"].info("%s is not a valid year.It must be in format YYYY", year)
         msg = f" {year} is not a valid year.It must be in format YYYY"
-        year_valid = year
-        raise argparse.ArgumentTypeError(msg)
+        year_valid =None
+        # raise argparse.ArgumentTypeError(msg)
     return year_valid
 
 
@@ -184,7 +184,7 @@ def valid_region(code):
         )
         msg = f" {code} is not an available region in Holiday Api."
         valid_code = None
-        raise argparse.ArgumentTypeError(msg)
+        # raise argparse.ArgumentTypeError(msg)
     return valid_code
 
 
