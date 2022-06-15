@@ -1,5 +1,5 @@
-"""This method get the record of an object from metamuseum api for the given object_id and endpoints and
-region based on their status codes"""
+"""This method get the record of an object from metamuseum api for the given object_id and 
+endpoints and region based on their status codes"""
 import requests
 
 
@@ -13,19 +13,18 @@ class MetaMuseumApi:
         self.section = section
 
     def get_endpoint_for_object_record(self, object_id):
-        """This method gets the endpoint for fetching the public holidays and long_weekend for given object_id and country
+        """This method gets the endpoint for fetching the public holidays and long_weekend for
+        given object_id and country
         parameters: object_id - object_id on which public metamuseum details are needed"""
         try:
             endpoint = f"objects/{object_id}"
-            self.logger.info("Got %s endpoint for given %s object id", endpoint,object_id)
+            self.logger.info("Got %s endpoint for given %s object id", endpoint, object_id)
             response = self.get_response_from_api(endpoint)
         except Exception as err:
-            self.logger.error(
-                "Cannot get the endpoint for %s and %s",object_id, err
-            )
+            self.logger.error("Cannot get the endpoint for %s and %s", object_id, err)
             response = None
         return response
-    
+
     # def get_endpoint_for_department(self):
     #     """This method gets the endpoint for fetching the public holidays and long_weekend for given object_id and country
     #     parameters: object_id - object_id on which public metamuseum details are needed"""
