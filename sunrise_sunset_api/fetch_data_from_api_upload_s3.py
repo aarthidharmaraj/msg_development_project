@@ -15,7 +15,7 @@ datas = LoggerPath.logger_object("sunrise_sunset_api")
 current_date = datetime.now().date()
 
 
-class SunriseSunsetDataUpload3:
+class SunriseSunsetDataUploadS3:
     """This class has methods to get sunrise and sunset data from api for the given date
     and location,partition them and upload to s3"""
 
@@ -74,18 +74,17 @@ class SunriseSunsetDataUpload3:
                 self.get_dataframe_for_response(response, single_date)
         except Exception as err:
             self.logger.error(
-                "Cannot able to get response from api for the date %s - %s", single_date, err
+                "Cannot able to get response from api for the date- %s",err
             )
             response = None
             print(err)
-            sys.exit("System has terminated for fail in getting response from api")
+            # sys.exit("System has terminated for fail in getting response from api")
         return response
 
     def get_dataframe_for_response(self, response, date):
         """This method gets response from api,convert to dataframe and create json file for that
         parameters : response - response from api
                      date - the date for which datas are fetched"""
-        # file_name - file_name to be uploaded in s3"""
         try:
             if response is not None:
                 self.logger.info("Got the response from api for %s", date)
@@ -180,7 +179,7 @@ def checkvalid_lat(lat):
         print(err)
         msg = f" {lat} is not valid latitude."
         valid_lat = None
-        raise argparse.ArgumentTypeError(msg)
+        # raise argparse.ArgumentTypeError(msg)
     return valid_lat
 
 
@@ -197,7 +196,7 @@ def checkvalid_long(long):
         datas["logger"].error("The given longitude %s is not an valid one %s", long, err)
         msg = f" {long} is not valid longitude."
         valid_long = None
-        raise argparse.ArgumentTypeError(msg)
+        # raise argparse.ArgumentTypeError(msg)
     return valid_long
 
 
@@ -218,7 +217,7 @@ def check_valid_date(date):
         )
         valid_date = None
         msg = f"{date} not valid.It must be in format YYYY-MM-DD and not greater then current date"
-        raise argparse.ArgumentTypeError(msg)
+        # raise argparse.ArgumentTypeError(msg)
     return valid_date
 
 
@@ -247,7 +246,7 @@ def main():
         type=check_valid_date,
     )
     args = parser.parse_args()
-    api_details = SunriseSunsetDataUpload3(
+    api_details = SunriseSunsetDataUploadS3(
         args.startdate, args.enddate, args.latitude, args.longitude
     )
     dates = api_details.get_details_for_givendates()
