@@ -30,7 +30,6 @@ class ThirukuralApi:
         try:
             base_url = self.section["basic_url"]
             request_url = base_url + endpoint
-            print(request_url)
             response = requests.get(request_url)
             if response.status_code != 200:
                 self.logger.error("Cannot get the response from api with %s", response.status_code)
