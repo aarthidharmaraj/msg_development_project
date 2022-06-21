@@ -24,6 +24,7 @@ class SunriseSunsetApi:
         except Exception as err:
             self.logger.error("Cannot get the endpoint for %s and %s", date, err)
             response = None
+            print(response)
         return response
 
     def get_response_from_api(self, endpoint):
