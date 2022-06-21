@@ -29,7 +29,7 @@ class ThirukuralDataUploadS3:
             api = ThirukuralApi(self.section, self.logger)
             self.logger.info("Getting response from api for kural %s", kural_num)
             response = api.get_endpoint_for_thirukural_data(kural_num)
-            # print(response)
+            print(response)
             self.get_dataframe_for_response(response, kural_num)
         except Exception as err:
             self.logger.error(
@@ -74,6 +74,7 @@ class ThirukuralDataUploadS3:
             df_data.to_json(
                 local_path + "/" + file_name,
                 orient="records",
+                force_ascii=False,
                 lines=True,
             )
             self.logger.info("Created the json file for %s", kural_num)
@@ -141,7 +142,7 @@ def check_valid_kuralnumber(kural_num):
         )
         valid_kural = None
         msg = f"{kural_num} not valid.It should be in between 1 and 1330 of exixting kurals"
-        raise argparse.ArgumentTypeError(msg)
+        # raise argparse.ArgumentTypeError(msg)
     return valid_kural
 
 
