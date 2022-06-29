@@ -5,7 +5,8 @@ import logging
 from cryptography.fernet import Fernet
 import configparser
 from datetime import datetime
-import py 
+import itertools
+import ast
 import pytest
 import pandas as pd
 import os
@@ -73,21 +74,21 @@ def upload_path(parent_dir, config_path):
 @pytest.fixture
 def startdate():
     """This method returns the start date"""
-    date="2022-06-05"
+    date="2022-06-27"
     cr_date = datetime.strptime(date, '%Y-%m-%d').date()
     return cr_date
 
 @pytest.fixture
 def enddate():
     """This method returns the end date"""
-    date="2022-06-06"
+    date="2022-06-29"
     cr_date = datetime.strptime(date, '%Y-%m-%d').date()
     return cr_date
 
 @pytest.fixture
 def dates(startdate,enddate):
     """This method returns the dict of startdate and enddate"""
-    dates={'date1':startdate,'date2':enddate}
+    dates={'date1':enddate,'date2':startdate}
     return dates
 
 @pytest.fixture
@@ -108,7 +109,8 @@ def region_code():
 @pytest.fixture
 def new_region():
     """This method returns the new_region for which datas are needed"""
-    return 'MX'
+    multiple_regions=[['AU', 'AS', 'GD']]
+    return multiple_regions
 
 @pytest.fixture
 def false_endpoint(region_code,strip_date):
@@ -183,9 +185,9 @@ def top100_endpoint(region_code,strip_date):
     return endpoint
 
 @pytest.fixture
-def file_name(endpoint,startdate):
+def file_name(endpoint,startdate,region_code):
     """This method returns the file name"""
-    return f"{endpoint}_on_{startdate}.json"
+    return f"{endpoint}_on_{startdate}_for_{region_code}.json"
 
 @pytest.fixture
 def wrong_file_name(endpoint,date_none):
@@ -335,6 +337,7 @@ class Test_UploadLocal:
         endpoint,
         partition_path,
         startdate,
+        region_code
     ):
         """This method will test for the nobelprize details is written to local file
         in class  ApiDataPartitionUploadLocal"""
@@ -343,7 +346,7 @@ class Test_UploadLocal:
         local_file = self.obj_local.upload_partition_s3_local(
             upload_path, copy_source, file_name, partition_path
         )
-        assert local_file == f"{endpoint}_on_{startdate}.json"
+        assert local_file == f"{endpoint}_on_{startdate}_for_{region_code}.json"
 
     @pytest.mark.xfail
     def test_upload_file_to_local_path_is_not_done(
@@ -433,98 +436,107 @@ class Test_EBirdApi:
 class Test_HistoricDataProductUploadS3():
     """This class tests the possible testcases in HistoricDataProductsUploadS3 class"""
     
-    def test_fetch_historic_product_datas_object(self,startdate,enddate,region_code):
+    def test_fetch_historic_product_datas_object(self,startdate,enddate,region_code,endpoint):
         """This method tests the instance of the class HistoricDataProductsUploadS3"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         assert isinstance(self.obj,HistoricDataProductsUploadS3)
     
-    def test_check_for_regions_available_done(self,startdate,enddate,region_code,config_section,dates):
+    def test_check_for_regions_available_done(self,startdate,enddate,region_code,endpoint_value,new_region,region_list,config_section,dates,endpoint):
         """This method tests for the given region is available in the config regions"""
-        available_regions = config_section["region"]
-        code_list=[]
-        code_list=available_regions.split(",")
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
-        region_code=self.obj.check_for_regions_available(dates)
-        assert region_code==code_list
+        available_regions = config_section["historic_region_list"]
+        endpoint_region = "historic_region_list"
+        self.obj = HistoricDataProductsUploadS3(startdate,enddate,new_region,endpoint)
+        region_code=self.obj.check_for_regions_available(dates,endpoint_value, available_regions,endpoint_region )
+        assert region_code is not None
     
-    def test_get_data_from_eachdate_isdone(self,startdate,enddate,region_code,region_list):
+    def test_get_data_from_eachdate_isdone(self,startdate,enddate,region_code,region_list,endpoint,endpoint_value):
         """This method tests for getting data for single date between the given dates"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
-        date=self.obj.get_data_from_api_for_eachdate(enddate,startdate,region_list)
-        assert date==enddate
+        print(region_list)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
+        date=self.obj.get_data_from_api_for_eachdate(enddate,startdate,region_list,endpoint_value)
+        assert date is not None
         
     @pytest.mark.xfail
-    def test_get_data_from_eachdate_is_notdone(self,date_none,enddate,region_code,region_list):
+    def test_get_data_from_eachdate_is_notdone(self,date_none,enddate,region_code,region_list,endpoint,endpoint_value):
         """This method tests for getting data for single date between the given dates is failed"""
-        self.obj = HistoricDataProductsUploadS3(date_none, enddate,region_code)
-        date=self.obj.get_data_from_api_for_eachdate(enddate,date_none,region_list)
+        self.obj = HistoricDataProductsUploadS3(date_none, enddate,region_code,endpoint)
+        date=self.obj.get_data_from_api_for_eachdate(enddate,date_none,region_list,endpoint_value)
         assert date is None
         
     def test_fetch_datframe_from_api_done(self,startdate,enddate,region_code,endpoint_value,endpoint):
         """This method tests for getting the historical observation from api and dataframe is created for the response"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         df_data=self.obj.fetch_dataframe_from_api_for_endpoints(region_code,startdate,endpoint,endpoint_value)
         assert df_data is not None
     
     @pytest.mark.xfail
-    def test_fetch_datframe_from_api_notdone(self,startdate,enddate,region_code,endpoint_value,false_endpoint):
+    def test_fetch_datframe_from_api_notdone(self,startdate,enddate,region_code,endpoint_value,false_endpoint,endpoint):
         """This method tests for getting the historical observation from api and dataframe is not created for the response"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         df_data=self.obj.fetch_dataframe_from_api_for_endpoints(region_code,startdate,false_endpoint,endpoint_value)
         assert df_data is None
     
     def test_create_json_for_dataframe_isdone(self,startdate,enddate,region_code,dataframe,endpoint,file_name):
         """This method tests the creation of json file for given dataframe is done """
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         file=self.obj.create_json_upload_s3(dataframe,startdate,region_code,endpoint)
         assert file==file_name
     
     @pytest.mark.xfail
-    def test_create_json_for_dataframe_is_notdone(self,startdate,enddate,region_code,dataframe,false_endpoint,file_name):
+    def test_create_json_for_dataframe_is_notdone(self,startdate,enddate,endpoint,region_code,dataframe,false_endpoint,file_name):
         """This method tests the creation of json file for given dataframe is not done """
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         file=self.obj.create_json_upload_s3(dataframe,startdate,region_code,false_endpoint)
         assert file is None 
     
     def test_put_partition_path_isdone(self,startdate, enddate,region_code,endpoint,partition_path,bucket_path):
         """This method tests the partition path is based on region, year, month and date"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
         path=self.obj.put_partition_path(bucket_path,region_code,startdate,endpoint)
         assert path==partition_path
     
     @pytest.mark.xfail
-    def test_put_partition_path_is_notdone(self,startdate, date_none,region_code,endpoint,partition_path,bucket_path):
+    def test_put_partition_path_is_notdone(self,startdate, date_none,region_code,endpoint,bucket_path):
         """This method tests the partition path is based on region, year, month and date is not made"""
-        self.obj = HistoricDataProductsUploadS3(startdate,date_none,region_code)
+        self.obj = HistoricDataProductsUploadS3(startdate,date_none,region_code,endpoint)
         path=self.obj.put_partition_path(bucket_path,region_code,date_none,endpoint)
         assert path is None
         
-    def test_exceution_last_date_isupdated(self, startdate,date_none,region_code,config_section):
+    def test_exceution_last_date_isupdated(self, startdate,date_none,region_code,config_section,endpoint):
         """This method tests for the last date of execution is updated in config file"""
-        self.obj = HistoricDataProductsUploadS3(startdate,date_none,region_code)
-        self.obj.last_date_of_execution()
-        last_date = config_section.get("last_run_date")
+        self.obj = HistoricDataProductsUploadS3(startdate,date_none,region_code,endpoint)
+        endpoint_date="historic_last_run_date"
+        self.obj.last_date_of_execution(endpoint_date)
+        last_date = config_section.get("historic_last_run_date")
         assert last_date == str(datetime.now().date())
 
     @pytest.mark.xfail
-    def test_exceution_last_date_is_notupdated(self, startdate, enddate,region_code):
+    def test_exceution_last_date_is_notupdated(self, startdate, enddate,region_code,endpoint):
         """This method tests for the last date of execution is updated in config file"""
-        self.obj = HistoricDataProductsUploadS3( startdate, enddate,region_code)
-        last_date=self.obj.last_date_of_execution()
+        self.obj = HistoricDataProductsUploadS3( startdate, enddate,region_code,endpoint)
+        endpoint_date="historic_last_run_date"
+        last_date=self.obj.last_date_of_execution(endpoint_date)
         assert last_date is None
     
-    def test_update_config_for_region_done(self,startdate,enddate,new_region,config_section):
+    def test_update_config_for_region_done(self,startdate,enddate,new_region,config_section,endpoint):
         """This method tests for updating the config if new region is given"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,new_region)
-        self.obj.update_config_if_region_not_exixts()
-        regions = config_section.get("region")
-        assert new_region in regions
-        
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,new_region,endpoint)
+        merged_region = list(itertools.chain(*new_region))
+        regions = ast.literal_eval(config_section.get("historic_region_list"))
+        for region in merged_region:
+            regions.append(region)
+        result=self.obj.update_config_if_not_exixts("eBird_api_datas","historic_region_list",str(regions))
+        assert result is "Updated"
+
     @pytest.mark.xfail
-    def test_update_config_for_region_notdone(self,startdate,enddate,region_code,config_section):
+    def test_update_config_for_region_notdone(self,startdate,enddate,region_code,config_section,new_region,endpoint):
         """This method tests for updating the config if new region is not given"""
-        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code)
-        regions=self.obj.update_config_if_region_not_exixts()
-        assert regions is None
+        self.obj = HistoricDataProductsUploadS3(startdate, enddate,region_code,endpoint)
+        merged_region = list(itertools.chain(*new_region))
+        regions = ast.literal_eval(config_section.get("historic_region_list"))
+        for region in merged_region:
+            regions.append(region)
+        regions=self.obj.update_config_if_not_exixts("eBird_api_datas","historic_region_list",regions)
+        assert regions is "failed"
         
         
