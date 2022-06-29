@@ -11,8 +11,7 @@ from fetch_data_partition_upload_local import ApiDataPartitionUploadLocal
 from get_response_from_api import SunriseSunsetApi
 
 datas = LoggerPath.logger_object("sunrise_sunset_api")
-# api = SunriseSunsetApi(datas["config"]["metamuseum_api"], datas["logger"])
-current_date = datetime.now().date()
+previous_date = datetime.now().date()-timedelta(days=1)
 
 
 class SunriseSunsetDataUploadS3:
@@ -45,11 +44,11 @@ class SunriseSunsetDataUploadS3:
                     self.logger.info("Cannot fetch details as startdate is greater than enddate")
                     sys.exit("script was terminated since startdate is greater than enddate")
             else:
-                dates = {"date1": current_date, "date2": self.startdate}
+                dates = {"date1": self.startdate, "date2": self.startdate}
                 self.logger.info(
                     "Fetching datas from api between %s and current date %s",
                     self.startdate,
-                    current_date,
+                    self.startdate,
                 )
         except Exception as err:
             dates = None
@@ -59,11 +58,11 @@ class SunriseSunsetDataUploadS3:
 
     def get_response_from_api(self, date1, date2):
         """This method fetches the sunrise and sunset datas from api based on the date and locations
-        parameters :  obj_id - the id of object for which datas are needed"""
+        parameters : date1 ,date 2 - the dates on which datas are needed"""
         try:
             api = SunriseSunsetApi(self.section, self.logger)
             day_count = (date1 - date2).days + 1
-            # print(day_count)
+            print(day_count)
             for day in range(day_count):  # Fetch for the given dates one by one
                 single_date = date2 + timedelta(day)
                 print(single_date)
@@ -77,8 +76,7 @@ class SunriseSunsetDataUploadS3:
                 "Cannot able to get response from api for the date- %s",err
             )
             response = None
-            print(err)
-            # sys.exit("System has terminated for fail in getting response from api")
+            sys.exit("System has terminated for fail in getting response from api")
         return response
 
     def get_dataframe_for_response(self, response, date):
@@ -92,7 +90,7 @@ class SunriseSunsetDataUploadS3:
                 df_data = df_data.transpose()
                 if not df_data.empty:
                     partition_path = self.put_partition_path(date)
-                    file_name = f"data_on_{date}.json"
+                    file_name = f"sunrise_sunset_on_{date}.json"
                     self.create_json_file_partition(df_data, file_name, partition_path, date)
             else:
                 self.logger.info("No responses from api for the %s", date)
@@ -179,7 +177,7 @@ def checkvalid_lat(lat):
         print(err)
         msg = f" {lat} is not valid latitude."
         valid_lat = None
-        # raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg)
     return valid_lat
 
 
@@ -196,7 +194,7 @@ def checkvalid_long(long):
         datas["logger"].error("The given longitude %s is not an valid one %s", long, err)
         msg = f" {long} is not valid longitude."
         valid_long = None
-        # raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg)
     return valid_long
 
 
@@ -204,20 +202,20 @@ def check_valid_date(date):
     """This method checks for the valid date entered and returns in datetime.date() format"""
     try:
         date = datetime.strptime(date, "%Y-%m-%d").date()
-        if date <= current_date:  # checks with current date
+        if date < datetime.now().date():  # checks with current date
             valid_date = date
             datas["logger"].info("The given date is a valid date %s", valid_date)
         else:
-            datas["logger"].info("Cannot get datas from api for future dates")
+            datas["logger"].info("Cannot get datas from api for current and  future dates")
             raise Exception
     except (Exception, ValueError):
         datas["logger"].info(
-            "%s not valid date.It must be in format YYYY-MM-DD and not greater then current date",
+            "%s not valid date.It must be in format YYYY-MM-DD and must be ended dates",
             date,
         )
         valid_date = None
-        msg = f"{date} not valid.It must be in format YYYY-MM-DD and not greater then current date"
-        # raise argparse.ArgumentTypeError(msg)
+        msg = f"{date} not valid.It must be in format YYYY-MM-DD and must be ended dates"
+        raise argparse.ArgumentTypeError(msg)
     return valid_date
 
 
@@ -227,18 +225,20 @@ def main():
         description="This argparser gets latitude,longitude,start,end dates to get data from sunrise sunset api"
     )
     parser.add_argument(
-        "latitude",
+        "--latitude",
         help="Enter the latitude for which details are needed",
         type=checkvalid_lat,
+        required=True
     )
     parser.add_argument(
-        "longitude", help="Enter the longitude for which details are needed", type=checkvalid_long
+        "--longitude", help="Enter the longitude for which details are needed", type=checkvalid_long,
+        required=True,
     )
     parser.add_argument(
         "--startdate",
         help="The date should be in format YYYY-MM-DD",
         type=check_valid_date,
-        default=current_date,
+        default=previous_date,
     )
     parser.add_argument(
         "--enddate",
