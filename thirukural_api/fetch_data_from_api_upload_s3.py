@@ -3,6 +3,7 @@ them based on section, and upload to s3"""
 import os
 import argparse
 import sys
+import itertools
 import pandas as pd
 from logger_path.logger_object_path import LoggerPath
 from aws_s3.s3_details import S3Details
@@ -10,7 +11,6 @@ from fetch_data_partition_upload_local import ApiDataPartitionUploadLocal
 from get_response_from_api import ThirukuralApi
 
 datas = LoggerPath.logger_object("thirukural_api")
-
 
 class ThirukuralDataUploadS3:
     """This class has methods to get thirukural data from api for the given kural number
@@ -27,10 +27,11 @@ class ThirukuralDataUploadS3:
         parameters : kural_num - the number for the kural for which datas are needed"""
         try:
             api = ThirukuralApi(self.section, self.logger)
-            self.logger.info("Getting response from api for kural %s", kural_num)
-            response = api.get_endpoint_for_thirukural_data(kural_num)
-            print(response)
-            self.get_dataframe_for_response(response, kural_num)
+            for kural_num in kural_num:
+                self.logger.info("Getting response from api for kural %s", kural_num)
+                print("\nFor kural number ",kural_num)
+                response = api.get_endpoint_for_thirukural_data(kural_num)
+                self.get_dataframe_for_response(response, kural_num)
         except Exception as err:
             self.logger.error(
                 "Cannot able to get response from api for the kural_num %s - %s", kural_num, err
@@ -142,7 +143,7 @@ def check_valid_kuralnumber(kural_num):
         )
         valid_kural = None
         msg = f"{kural_num} not valid.It should be in between 1 and 1330 of exixting kurals"
-        # raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg)
     return valid_kural
 
 
@@ -155,6 +156,7 @@ def main():
         "--kural_num",
         help="The kural_num should be one among the existing kurals",
         type=check_valid_kuralnumber,
+        nargs="*",
         required=True,
     )
     args = parser.parse_args()
