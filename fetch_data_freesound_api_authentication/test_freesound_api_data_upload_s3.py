@@ -145,9 +145,9 @@ def false_key():
 
 
 @pytest.fixture
-def partition_path(date):
+def partition_path(date,soundid):
     """This method returns the partition path based on date and endpoint"""
-    partition_path = date.strftime(f"pt_year=%Y/pt_month=%m/pt_day=%d")
+    partition_path = date.strftime(f"pt_year=%Y/pt_month=%m/pt_day=%d/pt_soundid={soundid}")
     return partition_path
 
 
@@ -420,7 +420,7 @@ class TestFreeSoundApiUploadS3:
         response = self.obj.fetch_response_from_api_for_endpoints()
         assert response is not None
 
-    @pytest.mark.xfail
+    # @pytest.mark.xfail
     def test_fetch_dataframe_for_endpoints_notdone(self, soundid, username, false_endpoint):
         """This method tests for getting the dataframe for the given endpoints is not done"""
         self.obj = FetchDataFromApiUploadS3(soundid, username, false_endpoint)
