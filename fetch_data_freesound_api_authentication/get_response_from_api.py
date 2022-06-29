@@ -44,7 +44,8 @@ class PullDataFromFreeSoundApi:
         """This method fetches similar sounds for the given sound id from api by ceating an endpoint
         parameters:  sound_id - the id of the song for which similar sounds are needed"""
         try:
-            endpoint = f"sounds/{sound_id}/similar/"
+            endpoint = f"sounds/{sound_id}/similar/?page=3650&page_size=150"
+            # https://freesound.org/apiv2/sounds/80408/similar/?page=1000
             self.logger.info(
                 "Getting the similar sound response from api with endpoint %s", endpoint
             )
@@ -101,4 +102,5 @@ class PullDataFromFreeSoundApi:
             self.logger.error(f"Cannot get the response from api due to problem in api{err}")
             print("No response from api", err)
             df_data = None
+            print(df_data)
         return df_data
