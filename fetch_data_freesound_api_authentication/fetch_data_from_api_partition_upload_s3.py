@@ -1,5 +1,5 @@
 """This module fetches Similar sounds, user_packs from freesound api for the provided
-sound id and username partition them based on the created date and upload them to s3
+sound id and username partition them based on the created date , sound id and upload them to s3
 in the given path """
 
 from datetime import datetime
