@@ -1,5 +1,6 @@
 """This module gets the data of the kural from thirukural api for the given kural number,partition
 them based on section, and upload to s3"""
+from datetime import timedelta
 import os
 import argparse
 import sys
@@ -97,9 +98,9 @@ class ThirukuralDataUploadS3:
         """This method will make partion path based on year,month and kural_num
         and avoid overwrite of file and upload to local"""
         try:
-            sect = response["sect_eng"]
-            chapgrp = response["chapgrp_eng"]
-            chap = response["chap_eng"]
+            sect = response["sect_eng"].replace(" ","_")
+            chapgrp = response["chapgrp_eng"].replace(" ","_")
+            chap = response["chap_eng"].replace(" ","_")
             partition_path = f"pt_section={sect}/pt_chaptergroup={chapgrp}/pt_chapter={chap}/pt_number={kural_num}"
             self.logger.info("Created the partition path for the given %s", kural_num)
         except Exception as err:
@@ -157,11 +158,23 @@ def main():
         help="The kural_num should be one among the existing kurals",
         type=check_valid_kuralnumber,
         nargs="*",
-        required=True,
     )
+    parser.add_argument("--startnum",help="Give the start range for kural details",type=check_valid_kuralnumber)
+    parser.add_argument("--endnum",help="Give the end range for kural details",type=check_valid_kuralnumber)
     args = parser.parse_args()
     api_details = ThirukuralDataUploadS3()
-    api_details.get_response_from_api(args.kural_num)
+    if args.kural_num:
+        api_details.get_response_from_api(args.kural_num)
+    elif args.startnum and args.endnum:
+        count = (args.endnum - args.startnum)+1
+        num=[]
+        for i in range(count):  # Fetch for the given range of numbers one by one
+            number = args.startnum +i
+            num.append(number) 
+        api_details.get_response_from_api(num)
+    else:
+        datas["logger"].error("Provide the Kural numbers or the range by giving start and end numbers")
+        print("Provide the Kural numbers or the range by giving start and end numbers")
 
 
 if __name__ == "__main__":
