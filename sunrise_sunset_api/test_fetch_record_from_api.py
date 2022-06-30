@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import configparser
 import pytest
+import ast
 import pandas as pd
 import requests
 import boto3
@@ -13,6 +14,7 @@ from fetch_data_from_api_upload_s3 import (
     check_valid_date,
     checkvalid_lat,
     checkvalid_long,
+    check_for_city_with_latitude_longitude
 )
 from fetch_data_partition_upload_local import ApiDataPartitionUploadLocal
 from get_response_from_api import SunriseSunsetApi
@@ -79,14 +81,32 @@ def upload_path(parent_dir, config_path):
 @pytest.fixture
 def lat():
     """This method returns the latitude"""
-    return "-56.45"
+    return 13.067439
 
+@pytest.fixture
+def city():
+    """This method returns the city"""
+    return "Chennai"
 
 @pytest.fixture
 def long():
     """This method returns the longitude"""
-    return "-156.45"
+    return 80.237617
 
+@pytest.fixture
+def available_cities(config_section):
+    """This method returns the available cities and its details in config"""
+    cities=config_section["cities"]
+    available_cities=ast.literal_eval(cities)
+    return available_cities
+@pytest.fixture
+def new_city(city,lat,long):
+    """This method creates the dict for the given lat, long, and city"""
+    new_dict = {}
+    new_dict[city] = {}
+    new_dict[city]['lat'] = lat
+    new_dict[city]['long'] =long
+    return new_dict
 
 @pytest.fixture
 def startdate():
@@ -123,10 +143,10 @@ def endpoint(lat, long, startdate):
 
 
 @pytest.fixture
-def partition_path(startdate, lat, long):
+def partition_path(startdate,city):
     """This method returns the partition path based on id"""
     partition_path = startdate.strftime(
-        f"pt_lat={lat}/pt_long={long}/pt_year=%Y/pt_month=%m/pt_day=%d"
+        f"pt_city={city}/pt_year=%Y/pt_month=%m/pt_day=%d"
     )
     return partition_path
 
@@ -134,7 +154,7 @@ def partition_path(startdate, lat, long):
 @pytest.fixture
 def file_name(startdate):
     """This method returns the file name"""
-    return f"data_on_{startdate}.json"
+    return f"sunrise_sunset_on_{startdate}.json"
 
 
 @pytest.fixture
@@ -390,78 +410,116 @@ class TestSunriseSunsetApi:
 class TestSunriseSunsetDataUploadS3:
     """This class tests for possible testcases in SunriseSunsetDataUploadS3"""
 
-    def test_fetch_record_s3_object(self, startdate, enddate, lat, long):
+    def test_fetch_record_s3_object(self, startdate, enddate, lat, long,city):
         """This method tests for instance of the class SunriseSunsetDataUploadS3"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
         assert isinstance(self.obj, SunriseSunsetDataUploadS3)
 
-    def test_get_response_from_api_done(self, startdate, enddate, lat, long):
+    def test_get_response_from_api_foreachcity_done(self, startdate, enddate, lat, long,city):
         """This method tests for getting response from sunrise sunset api for the given date, location is done"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
-        response = self.obj.get_response_from_api(enddate, startdate)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        response = self.obj.get_response_from_api(enddate, startdate,city,lat,long)
         assert response is not None
 
     @pytest.mark.xfail
-    def test_get_response_from_api_notdone(self, date_none, startdate, enddate, lat, long):
+    def test_get_response_from_api_foreachcity_notdone(self, date_none, startdate, enddate, lat, long,city):
         """This method tests for getting response from sunrise sunset api for the given date, location is notdone"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
-        response = self.obj.get_response_from_api(startdate, date_none)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        response = self.obj.get_response_from_api(startdate, date_none,city,lat,long)
         assert response is None
 
     def test_create_dataframe_for_response_done(
-        self, response, startdate, enddate, lat, long
+        self, response, startdate, enddate, lat, long,city
     ):
         """Thi smethod tests for creating dataframe for the response is done"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
-        dataframe = self.obj.get_dataframe_for_response(response, startdate)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        dataframe = self.obj.get_dataframe_for_response(response, startdate,city)
         assert isinstance(dataframe, pd.DataFrame)
 
     @pytest.mark.xfail
     def test_create_dataframe_for_response_notdone(
-        self, false_response, startdate, enddate, lat, long
+        self, false_response, startdate, enddate, lat, long,city
     ):
         """This method tests for creating dataframe for the response is notdone"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
-        dataframe = self.obj.get_dataframe_for_response(false_response,None)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        dataframe = self.obj.get_dataframe_for_response(false_response,None,city)
         assert dataframe is None
 
     def test_create_json_file_done(
-        self, dataframe, file_name, partition_path, startdate, enddate, lat, long
+        self, dataframe, file_name, partition_path, startdate, enddate, lat, long,city
     ):
         """This method tests for creating the json file for the dataframe is done"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
         file = self.obj.create_json_file_partition(dataframe, file_name, partition_path, startdate)
         assert file == file_name
 
     @pytest.mark.xfail
     def test_create_json_file_notdone(
-        self, file_name, partition_path, startdate, enddate, lat, long
+        self, file_name, partition_path, startdate, enddate, lat, long,city
     ):
         """This method tests for creating the json file for the dataframe is not done"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
         dataframe = None
         file = self.obj.create_json_file_partition(dataframe, file_name, partition_path, startdate)
         assert file is None
 
-    def test_put_partition_path_done(self, partition_path, startdate, enddate, lat, long):
+    def test_get_lat_long_city_from_config_done(self, startdate, enddate, lat, long,city):
+        """This method tests to get latitude , longitude and city values from config if user is not given is done"""
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        response=self.obj.get_lat_long_city_from_config(enddate,startdate)
+        assert response is not None
+        
+    @pytest.mark.xfail
+    def test_get_lat_long_city_from_config_notdone(self, startdate, enddate,date_none, lat, long,city):
+        """This method tests to get latitude , longitude and city values from config if user is not given is notdone"""
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        response=self.obj.get_lat_long_city_from_config(startdate,date_none)
+        assert response is  None
+        
+    def test_put_partition_path_done(self, partition_path, startdate, enddate, lat, long,city):
         """This method tests to put the partition path based on object id is done"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long)
-        path = self.obj.put_partition_path(startdate)
+        self.obj = SunriseSunsetDataUploadS3(startdate, enddate, lat, long,city)
+        path = self.obj.put_partition_path(startdate,city)
         assert path == partition_path
 
     @pytest.mark.xfail
-    def test_put_partition_path_notdone(self, startdate, lat, long, date_none):
+    def test_put_partition_path_notdone(self, startdate, lat, long, date_none,city):
         """This method tests to put the partition path based on object id is notdone"""
-        self.obj = SunriseSunsetDataUploadS3(startdate, date_none, lat, long)
-        path = self.obj.put_partition_path(date_none)
+        self.obj = SunriseSunsetDataUploadS3(startdate, date_none, lat, long,city)
+        path = self.obj.put_partition_path(date_none,city)
         assert path is None
+    
+    def test_update_config_is_done(self,new_city,startdate, date_none, lat, long,city,available_cities):
+        """This method tests the new city and its details are updated in config"""
+        self.obj = SunriseSunsetDataUploadS3(startdate, date_none, lat, long,city)
+        result=self.obj.update_config_if_not_exists(new_city,available_cities)
+        assert result is "success"
+    
+    @pytest.mark.xfail
+    def test_update_config_is_notdone(self,new_city,startdate, date_none, lat, long,city,available_cities):
+        """This method tests the new city and its details are not updated in config"""
+        self.obj = SunriseSunsetDataUploadS3(startdate, date_none, lat, long,city)
+        result=self.obj.update_config_if_not_exists(str(new_city),available_cities)
+        assert result is "failed"
+
+    def test_check_valid_city_done(self,lat,long,city):
+        """This method checks the given city matches with the city of given latitude and longitude"""
+        get_city=check_for_city_with_latitude_longitude(lat, long,city)
+        assert get_city ==city
+
+    @pytest.mark.xfail
+    def test_check_valid_city_notdone(self,lat,long,city):
+        """This method checks the given city not matches with the city of given latitude and longitude"""
+        get_city=check_for_city_with_latitude_longitude(lat, long,"Chenna")
+        assert get_city is None
+
 
     def test_check_lat_long_is_valid(self, lat, long):
         """This method checks the given latitide and longitude values are in the range"""
         valid_lat = checkvalid_lat(lat)
         valid_long = checkvalid_long(long)
-        assert valid_lat == float(lat)
-        assert valid_long == float(long)
+        assert valid_lat == lat
+        assert valid_long == long
 
     @pytest.mark.xfail
     def test_check_lat_long_is_notvalid(self):
