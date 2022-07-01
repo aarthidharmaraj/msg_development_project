@@ -76,6 +76,10 @@ def object_id():
     """This method returns the object id for getting object record"""
     return 888210
 
+@pytest.fixture
+def objects():
+    """This method returns the list of objectid"""
+    return [888210,34454,34234]
 
 @pytest.fixture
 def false_id():
@@ -361,10 +365,10 @@ class TestMetaMuseumFetchRecordsUploadS3:
         self.obj = MetaMuseumObjectRecordS3()
         assert isinstance(self.obj, MetaMuseumObjectRecordS3)
 
-    def test_get_response_from_api_done(self, object_id):
+    def test_get_response_from_api_done(self, objects):
         """This method tests for getting response from meta museum api for the given object id is done"""
         self.obj = MetaMuseumObjectRecordS3()
-        response = self.obj.get_response_from_api(object_id)
+        response = self.obj.get_response_from_api(objects)
         assert response is not None
 
     @pytest.mark.xfail
