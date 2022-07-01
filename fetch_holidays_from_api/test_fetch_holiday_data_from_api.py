@@ -5,6 +5,7 @@ from datetime import datetime
 import configparser
 from numpy import isin
 import pytest
+import ast
 import pandas as pd
 import requests
 import boto3
@@ -95,6 +96,11 @@ def region():
     """This method returns the region for which datas are needed"""
     return "MX"
 
+
+@pytest.fixture
+def regions_list():
+    """This method returns the list of regions"""
+    return ['MX']
 
 @pytest.fixture
 def false_region():
@@ -436,19 +442,19 @@ class TestFetchFromApiUploadS3:
         years_list = self.obj.get_year_list_from_given_years()
         assert isinstance(years_list, list)
 
-    def test_get_response_from_api_done(self, start_year, end_year, region, epoint):
+    def test_get_response_from_api_done(self, start_year, end_year, region, epoint,regions_list):
         """This method tests fro getting the resposne from api for the given endpoint"""
         self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, region)
         years_list = self.obj.get_year_list_from_given_years()
-        response = self.obj.get_response_from_api(years_list, epoint)
+        response = self.obj.get_response_from_api(years_list, epoint,regions_list)
         assert response is not None
 
     @pytest.mark.xfail
-    def test_get_response_from_api_notdone(self, start_year, end_year, region, false_endpoint):
+    def test_get_response_from_api_notdone(self, start_year, end_year, region, false_endpoint,regions_list):
         """This method tests fro getting the resposne from api for the given endpoint"""
         self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, region)
         years_list = self.obj.get_year_list_from_given_years()
-        response = self.obj.get_response_from_api(years_list, false_endpoint)
+        response = self.obj.get_response_from_api(years_list, false_endpoint,regions_list)
         assert response is None
 
     def test_create_dataframe_for_response_done(
@@ -493,10 +499,40 @@ class TestFetchFromApiUploadS3:
         )
         assert file is None
 
+    def test_get_endpoint_region_lists_done(self,start_year, end_year, regions_list,epoint):
+        """This method tests for getting the endpoints and their corresponding region lists"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, regions_list)
+        response=self.obj.get_endpoint_region_lists(epoint)
+        assert response is not None
+        
+    @pytest.mark.xfail
+    def test_get_endpoint_region_lists_notdone(self,start_year, end_year, regions_list,false_endpoint):
+        """This method tests for getting the endpoints and their corresponding region lists is failed"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year,None, regions_list)
+        response=self.obj.get_endpoint_region_lists(false_endpoint)
+        assert response is None
+
+    def test_check_region_is_available_done(self,start_year, end_year, regions_list,config_section):
+        """This method checks the new region is not available in config"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, regions_list)
+        available_regions=config_section["publicholiday_region_list"]
+        region_name="publicholiday_region_list"
+        regions=self.obj.check_region_is_available(available_regions, region_name)
+        assert regions is not None
+    
+    @pytest.mark.xfail
+    def test_check_region_is_available_notdone(self,start_year, end_year, region,config_section):
+        """This method checks the new region is available in config"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, region)
+        available_regions=config_section["publicholiday_region_list"]
+        region_name="publicholiday_region_list"
+        regions=self.obj.check_region_is_available(available_regions, region_name)
+        assert regions == []
+
     def test_put_partition_path_isdone(self, start_year, end_year, region, epoint, partition_path):
         """This method tests the partition path is given based on the year, region"""
         self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, region)
-        path = self.obj.put_partition_path(start_year, epoint)
+        path = self.obj.put_partition_path(start_year, epoint,region)
         assert path == partition_path
 
     @pytest.mark.xfail
@@ -505,9 +541,26 @@ class TestFetchFromApiUploadS3:
     ):
         """This method tests the partition path is given based on the year, region"""
         self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, false_region)
-        path = self.obj.put_partition_path(start_year, epoint)
+        path = self.obj.put_partition_path(start_year, epoint,false_region)
         assert path == wrong_partition_path
-
+        
+    def test_update_config_is_done(self,start_year, end_year, false_region,regions_list,config_section):
+        """This method tests the new regions are updated in config"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, false_region)
+        available_regions=ast.literal_eval(config_section["publicholiday_region_list"])
+        region_name="publicholiday_region_list"
+        result=self.obj.update_config_if_not_exists(region_name, available_regions,regions_list)
+        assert result is "Updated"
+    
+    @pytest.mark.xfail
+    def test_update_config_is_notdone(self,start_year, end_year, false_region,regions_list,config_section):
+        """This method tests the new regions are not updated in config"""
+        self.obj = PublicHolidaysLongWeekendS3(start_year, end_year, false_region)
+        available_regions=ast.literal_eval(config_section["publicholiday_region_list"])
+        region_name="publicholiday_region_list"
+        result=self.obj.update_config_if_not_exists(region_name, available_regions,str(regions_list))
+        assert result is "failed"
+        
     def test_year_is_valid(self, start_year):
         """This method tests the given year is valid"""
         valid_years = valid_year(str(start_year))
@@ -527,7 +580,7 @@ class TestFetchFromApiUploadS3:
         assert available_reg == region
 
     @pytest.mark.xfail
-    def test_region_is_notvalid(self, region):
+    def test_region_is_notvalid(self, false_region):
         """This method tests the given region is not available in holiday api"""
         available_reg = valid_region(false_region)
         assert available_reg is None
