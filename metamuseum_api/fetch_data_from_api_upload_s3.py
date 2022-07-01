@@ -30,14 +30,15 @@ class MetaMuseumObjectRecordS3:
         """This method fetches the record of object from meta museum api based on the object id
         parameters :  obj_id - the id of object for which datas are needed"""
         try:
-            self.logger.info("Getting response from api for %s id", obj_id)
-            response = self.api.get_endpoint_for_object_record(obj_id)
-            # print(response)
-            file_name = f"record_for_{obj_id}.json"
-            self.get_dataframe_for_response(response, obj_id, file_name)
+            for id in obj_id:
+                print(id)
+                self.logger.info("Getting response from api for %s id", id)
+                response = self.api.get_endpoint_for_object_record(id)
+                file_name = f"record_for_id{id}.json"
+                self.get_dataframe_for_response(response, id, file_name)
         except Exception as err:
             self.logger.error(
-                "Cannot able to get response from api for the obj_id %s - %s", obj_id, err
+                "Cannot able to get response from api for the given obj_id - %s", err
             )
             response = None
             print(err)
@@ -59,9 +60,12 @@ class MetaMuseumObjectRecordS3:
                     self.create_json_file_partition(df_data, file_name, partition_path, obj_id)
             else:
                 self.logger.info("No responses from api for the %s", obj_id)
+
                 df_data = None
+                raise Exception
         except Exception as err:
             self.logger.error("Cannot create the dataframe for the given response %s", err)
+            print("cannot get the response from api for the object id",obj_id)
             df_data = None
         return df_data
 
@@ -123,37 +127,13 @@ class MetaMuseumObjectRecordS3:
             file = None
         return file
 
-
-# def valid_object_id(obj_id):
-#     """This method checks the available object id in metamuseum api"""
-#     try:
-#         endpoint = "objects"
-#         response = api.get_response_from_api(endpoint)
-#         print(type(response["objectIDs"]))
-#         if obj_id in response["objectIDs"]:
-#             valid_id = obj_id
-#             datas["logger"].info("The given id %s is available in meta museum api",obj_id)
-#         else:
-#             print("No")
-#             raise Exception
-#         # valid_id=None
-#     except Exception as err:
-#         datas["logger"].error(
-#             "The given id %s is not available in meta museum api %s", obj_id, err
-#         )
-#         print(err)
-#         msg = f" {obj_id} is not an available object in meta museum api."
-#         valid_id = None
-#         raise argparse.ArgumentTypeError(msg)
-#     return valid_id
-
-
 def main():
     """This is the main method for this module"""
     parser = argparse.ArgumentParser(
         description="This argparser is to get the object id to fetch objects data from meta museum api"
     )
-    parser.add_argument("--objectid", help="Enter the object id", type=int, required=True)
+    parser.add_argument("--objectid", help="Enter the object id", type=int, required=True,
+        nargs="*")
     args = parser.parse_args()
     api_details = MetaMuseumObjectRecordS3()
     api_details.get_response_from_api(args.objectid)
