@@ -8,16 +8,18 @@ class DynamoDB:
         self.logger=logger
         self.resource= boto3.resource('dynamodb')
     
-    def create_table_dynamodb(self,**kwargs):
+    def create_table_dynamodb(self,kwargs):
         """This method will create a table with the arguments in dynamoDB"""
         try:
             table = self.resource.create_table(**kwargs)
+            print(table)
         except Exception as err:
             self.logger.error("Cannot create the table in dynamoDB %s",err)
+            print(err)
             table=None
         return table
     
-    def put_item_table(self,table_name,**kwargs):
+    def put_item_table(self,table_name,kwargs):
         """This method put an item in a table"""
         try:
             table = self.resource.Table(table_name)
@@ -27,7 +29,7 @@ class DynamoDB:
             item=None
         return item
     
-    def get_item_from_table(self,table_name,**kwargs):
+    def get_item_from_table(self,table_name,kwargs):
         """This method gets an item from the table"""
         try:
             table = self.resource.Table(table_name)
@@ -37,12 +39,15 @@ class DynamoDB:
             item=None
         return item
         
-    def update_item_from_table(self,table_name,**kwargs):
+    def update_item_from_table(self,table_name,kwargs):
         """This method updates an item in the table"""
         try:
-            table = self.resource.Table(table_name,**kwargs)
+            table = self.resource.Table(table_name)
             item= table.update_item(**kwargs)
+            print(item)
         except Exception as err:
+            print(err)
             self.logger.error("Cannot update item in the table %s",err)
             item=None
         return item
+    
