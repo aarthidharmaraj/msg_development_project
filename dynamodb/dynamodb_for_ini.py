@@ -22,34 +22,36 @@ class DynamodbConfigSections:
             table=self.dynamodb.create_table_dynamodb(args)
             self.logger.info("Created the table in dynamodb for the given parameters")
         except Exception as err:
+            print(err)
             self.logger.error("Cannot create the table in dynamodb for the given parameters")
             table=None
         return table
     
-    def put_item_in_table_dynamodb(self,args):
+    def put_item_in_table_dynamodb(self,table_name,args):
         """This method puts an item in the table with the given parameters of config datas"""
         try:
-            response=self.dynamodb.put_item_table(args)
+            response=self.dynamodb.put_item_table(table_name,args)
             self.logger.info("Inserted an item in table with the given parameters")
         except Exception as err:
             self.logger.error("Cannot insert the item in the table with the given parameters")
+            print(err)
             response=None
         return response
     
-    def get_item_from_table_dynamodb(self,args):
+    def get_item_from_table_dynamodb(self,table_name,args):
         """This method gets an item in the table with the given parameters of config datas"""
         try:
-            response=self.dynamodb.get_item_from_table(args)
+            response=self.dynamodb.get_item_from_table(table_name,args)
             self.logger.info("Got an item in table with the given parameters")
         except Exception as err:
             self.logger.error("Cannot get the item in the table with the given parameters")
             response=None
         return response
             
-    def update_item_in_table_dynamodb(self,args):
+    def update_item_in_table_dynamodb(self,table_name,args):
         """This method Updates an item in the table with the given parameters of config datas"""
         try:
-            response=self.dynamodb.update_item_from_table(args)
+            response=self.dynamodb.update_item_from_table(table_name,args)
             self.logger.info("Updated the item in table with the given parameters")
         except Exception as err:
             self.logger.error("Cannot update the item in the table with the given parameters")
@@ -63,16 +65,16 @@ def main():
     )
     subparsers = parser.add_subparsers()
     sub_create_table= subparsers.add_parser('create_table')
-    sub_create_table.add_argument("parameters",ast.literal_eval)
+    sub_create_table.add_argument("parameters")
     sub_put_item= subparsers.add_parser('put_item')
     sub_put_item.add_argument('table_name',type=str)
-    sub_put_item.add_argument("parameters",ast.literal_eval)
+    sub_put_item.add_argument("parameters")
     sub_get_item= subparsers.add_parser('get_item')
     sub_get_item.add_argument('table_name',type=str)
-    sub_get_item.add_argument("parameters",ast.literal_eval)
+    sub_get_item.add_argument("parameters")
     sub_update_item= subparsers.add_parser('update_item')
     sub_update_item.add_argument('table_name',type=str)
-    sub_update_item.add_argument("parameters",ast.literal_eval)
+    sub_update_item.add_argument("parameters")
     args = parser.parse_args()
     print(args)
     
