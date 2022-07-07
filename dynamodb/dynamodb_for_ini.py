@@ -2,6 +2,7 @@
 item in the table, get item from table and update an item in table in dynamodb for storing
 the config values and use them in script"""
 import argparse
+import ast
 from dynamodb_table_item import DynamoDB
 from logger_path.logger_object_path import LoggerPath
 datas=LoggerPath.logger_object("dynamodb")
@@ -62,16 +63,16 @@ def main():
     )
     subparsers = parser.add_subparsers()
     sub_create_table= subparsers.add_parser('create_table')
-    sub_create_table.add_argument("parameters")
+    sub_create_table.add_argument("parameters",ast.literal_eval)
     sub_put_item= subparsers.add_parser('put_item')
     sub_put_item.add_argument('table_name',type=str)
-    sub_put_item.add_argument("parameters")
+    sub_put_item.add_argument("parameters",ast.literal_eval)
     sub_get_item= subparsers.add_parser('get_item')
     sub_get_item.add_argument('table_name',type=str)
-    sub_get_item.add_argument("parameters")
+    sub_get_item.add_argument("parameters",ast.literal_eval)
     sub_update_item= subparsers.add_parser('update_item')
     sub_update_item.add_argument('table_name',type=str)
-    sub_update_item.add_argument("parameters")
+    sub_update_item.add_argument("parameters",ast.literal_eval)
     args = parser.parse_args()
     print(args)
     
