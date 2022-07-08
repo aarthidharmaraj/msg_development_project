@@ -10,16 +10,9 @@ class DynamoDB:
         with mock_dynamodb():
             self.resource = boto3.resource('dynamodb', 'us-east-1')
     
-    # def dynamodb_mock():
-    #     """This method is to mock the dynamodb resources"""
-    #     with mock_dynamodb():
-    #         dynamodb = boto3.resource('dynamodb', 'us-east-1')
-    #         yield dynamodb
-    
     def create_table_dynamodb(self,kwargs):
         """This method will create a table with the arguments in dynamoDB"""
         try:
-            # print(kwargs)
             with mock_dynamodb():
                 dynamodb = boto3.resource('dynamodb', 'us-east-1')
                 table = dynamodb.create_table(**kwargs)
@@ -33,14 +26,12 @@ class DynamoDB:
     def put_item_table(self,table_name,table_kwargs,put_kwargs):
         """This method put an item in a table"""
         try:
-            # print(kwargs)
             with mock_dynamodb():
                 dynamodb = boto3.resource('dynamodb', 'us-east-1')
                 dynamodb.create_table(**table_kwargs)
                 table =dynamodb.Table(table_name)
                 item = table.put_item(**put_kwargs)
             print(table)
-            # item = table.put_item(**kwargs)
         except Exception as err:
             print(err)
             self.logger.error("Cannot put an item in the table %s",err)
@@ -56,10 +47,11 @@ class DynamoDB:
                 table =dynamodb.Table(table_name)
                 item = table.put_item(**put_kwargs)
                 item = table.get_item(**get_kwargs)
-                # print(item)
+                print(item['Item']['section_data'])
         except Exception as err:
             self.logger.error("Cannot get an item from the table %s",err)
             item=None
+            print(err)
         return item['Item']['section_data']
         
     def update_item_from_table(self,table_name,kwargs):

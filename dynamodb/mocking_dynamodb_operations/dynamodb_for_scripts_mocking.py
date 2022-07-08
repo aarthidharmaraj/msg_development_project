@@ -40,7 +40,7 @@ class DynamodbConfigSections:
         """This method returns the arguments for get item method in dynamodb"""
         parameters={'Key':{
             'section_id': 1,
-            'section_name':'freesound_api'
+            'section_name':'metamuseum_api'
         },
         }
         return parameters
@@ -48,9 +48,7 @@ class DynamodbConfigSections:
     def create_table(self,args):
         """This method creates the table in dynamodb with the given parameters of config datas"""
         try:
-            # args=self.create_table_args()
             table=self.dynamodb.create_table_dynamodb(args)
-            # print(table)
             self.logger.info("Created the table in dynamodb for the given parameters")
         except Exception as err:
             print(err)
@@ -61,8 +59,6 @@ class DynamodbConfigSections:
     def put_item_in_table_dynamodb(self,table_name,args,kwargs):
         """This method puts an item in the table with the given parameters of config datas"""
         try:
-            # args=self.put_item_args()
-            # self.create_table()
             response=self.dynamodb.put_item_table(table_name,args,kwargs)
             print(response)
             self.logger.info("Inserted an item in table with the given parameters")
@@ -75,9 +71,6 @@ class DynamodbConfigSections:
     def get_item_from_table_dynamodb(self,table_name,table_args,put_args,get_args):
         """This method gets an item in the table with the given parameters of config datas"""
         try:
-            
-            # args=self.get_item_args()
-            # self.put_item_in_table_dynamodb(table_name)
             response=self.dynamodb.get_item_from_table(table_name,table_args,put_args,get_args)
             self.logger.info("Got an item in table with the given parameters")
         except Exception as err:
@@ -97,34 +90,36 @@ class DynamodbConfigSections:
         
 def main():
     """This is te main method for the class DynamodbConfigSections"""
-    # parser = argparse.ArgumentParser(
-    #     description="This argparser is to parameters for the methods in dynamodb separately"
-    # )
-    # subparsers = parser.add_subparsers()
-    # sub_create_table= subparsers.add_parser('create_table')
-    # sub_create_table.add_argument("parameters",type=ast.literal_eval)
-    # sub_put_item= subparsers.add_parser('put_item')
-    # sub_put_item.add_argument('table_name',type=str)
-    # sub_put_item.add_argument("parameters",type=ast.literal_eval)
-    # sub_get_item= subparsers.add_parser('get_item')
-    # sub_get_item.add_argument('table_name',type=str)
-    # sub_get_item.add_argument("parameters",type=ast.literal_eval)
-    # sub_update_item= subparsers.add_parser('update_item')
-    # sub_update_item.add_argument('table_name',type=str)
-    # sub_update_item.add_argument("parameters",type=ast.literal_eval)
-    # args = parser.parse_args()
-    # print(args)
+    parser = argparse.ArgumentParser(
+        description="This argparser is to parameters for the methods in dynamodb separately"
+    )
+    subparsers = parser.add_subparsers()
+    sub_create_table= subparsers.add_parser('create_table')
+    sub_create_table.add_argument("param_create",type=ast.literal_eval)
+    sub_put_item= subparsers.add_parser('put_item')
+    sub_put_item.add_argument('table_name',type=str)
+    sub_put_item.add_argument("param_put",type=ast.literal_eval)
+    sub_get_item= subparsers.add_parser('get_item')
+    sub_get_item.add_argument('table_name',type=str)
+    sub_get_item.add_argument("param_get",type=ast.literal_eval)
+    sub_update_item= subparsers.add_parser('update_item')
+    sub_update_item.add_argument('table_name',type=str)
+    sub_update_item.add_argument("param_update",type=ast.literal_eval)
+    args = parser.parse_args()
     dynamo=DynamodbConfigSections()
     table_args=dynamo.create_table_args()
-    # dynamo.create_table(args)
-    put_args=dynamo.put_item_args()
+    if args.__dict__.get("param_create"):
+        dynamo.create_table(args.param_create)
+    if args.__dict__.get('param_put'):
+        print(args.table_name,args.param_put)
+        dynamo.put_item_in_table_dynamodb(args.table_name,table_args,args.param_put)
+    elif args.__dict__.get("param_get"):
+        put_args=dynamo.put_item_args()
+        dynamo.get_item_from_table_dynamodb(args.table_name,table_args,put_args,args.param_get)
+    # put_args=dynamo.put_item_args()
     # dynamo.put_item_in_table_dynamodb('config_section',table_args,put_args)
-    get_args=dynamo.get_item_args()
-    dynamo.get_item_from_table_dynamodb('config_section',table_args,put_args,get_args)
-    
-    
-    
-    
+    # get_args=dynamo.get_item_args()
+    # dynamo.get_item_from_table_dynamodb('config_section',table_args,put_args,get_args)
     
 if __name__ == "__main__":
     main()
